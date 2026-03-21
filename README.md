@@ -111,7 +111,7 @@ All defaults use free-tier OpenRouter models:
 |------|-------|
 | Analytical | Mistral 7B |
 | Devil's Advocate | Llama 3.2 3B |
-| Creative | Gemma 3 4B |
+| Creative | Qwen3 4B |
 | Pragmatist | Phi-3 Mini |
 | Synthesizer | DeepSeek R1 1.5B |
 | **Master** | **Mistral Small 24B** |
