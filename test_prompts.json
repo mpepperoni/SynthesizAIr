@@ -1,0 +1,54 @@
+{
+  "prompts": [
+    {
+      "id": "str-1",
+      "prompt": "Should a bootstrapped SaaS startup focus on product development or sales first, and why?",
+      "category": "Strategy/Planning"
+    },
+    {
+      "id": "str-2",
+      "prompt": "What are the most effective strategies for a company to reduce customer churn below 2% monthly?",
+      "category": "Strategy/Planning"
+    },
+    {
+      "id": "res-1",
+      "prompt": "What does current research say about the long-term cognitive effects of chronic sleep deprivation?",
+      "category": "Research/Synthesis"
+    },
+    {
+      "id": "res-2",
+      "prompt": "Summarise the key findings on the effectiveness of spaced repetition versus massed practice for long-term retention.",
+      "category": "Research/Synthesis"
+    },
+    {
+      "id": "ana-1",
+      "prompt": "Compare monolithic versus microservices architecture for a 5-engineer startup expected to scale to 50 in two years.",
+      "category": "Analysis/Evaluation"
+    },
+    {
+      "id": "ana-2",
+      "prompt": "Evaluate the trade-offs between hiring senior engineers at high cost versus training junior engineers in a fast-moving team.",
+      "category": "Analysis/Evaluation"
+    },
+    {
+      "id": "cre-1",
+      "prompt": "Generate novel, non-obvious approaches to teaching programming concepts to children aged 8–12.",
+      "category": "Creative/Brainstorming"
+    },
+    {
+      "id": "cre-2",
+      "prompt": "What are unexpected ways a public library could reinvent itself to remain essential to a community in 2030?",
+      "category": "Creative/Brainstorming"
+    }
+  ],
+  "combinations": [
+    {
+      "name": "Default",
+      "use_defaults": true
+    }
+  ],
+  "judge_model": {
+    "id": "mistralai/mistral-small-3.1-24b-instruct:free",
+    "label": "Mistral Small 24B (Judge)"
+  }
+}
