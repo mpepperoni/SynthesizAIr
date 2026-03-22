@@ -16,6 +16,8 @@ from config import (
     CATEGORIES,
     CATEGORY_NAMES,
     DEFAULT_MASTER_MODEL,
+    DEFAULT_NONFREE_MASTER_MODEL,
+    DEFAULT_NONFREE_SUB_MODELS,
     DEFAULT_SUB_MODELS,
     DISAGREEMENT_ABSENT_MARKER,
     OPENROUTER_MODELS_ENDPOINT,
@@ -127,16 +129,79 @@ def parse_indices(raw: str, max_idx: int) -> list[int] | None:
         return None
 
 
+async def _pick_roles_for_models(sub_models: list[dict]) -> list[dict]:
+    """Interactively assign a unique cognitive role to each sub-model. Returns sub_models with roles set."""
+    console.print("\n[bold]Assign a cognitive role to each sub-model:[/]\n")
+    display_roles()
+    console.print()
+
+    assigned_roles: list[str] = []
+    remaining_roles = list(ROLE_NAMES)
+
+    for i, m in enumerate(sub_models):
+        available = [(j + 1, r) for j, r in enumerate(ROLE_NAMES) if r in remaining_roles]
+        available_str = "  ".join(
+            f"[{ROLES[r]['color']}][{idx}] {r}[/]" for idx, r in available
+        )
+        console.print(f"[bold]Sub-model {i + 1}:[/] {m['label']}")
+        console.print(f"Available: {available_str}")
+
+        valid_nums = [str(idx) for idx, _ in available]
+        while True:
+            raw = Prompt.ask(f"  Role for {m['label']}", choices=valid_nums)
+            selected_role = ROLE_NAMES[int(raw) - 1]
+            if selected_role not in remaining_roles:
+                console.print("[red]That role is already taken. Pick another.[/]")
+                continue
+            assigned_roles.append(selected_role)
+            remaining_roles.remove(selected_role)
+            break
+
+        console.print()
+
+    for m, role in zip(sub_models, assigned_roles):
+        m["role"] = role
+
+    return sub_models
+
+
+async def _auto_configure(
+    sub_models: list[dict], master_model: dict
+) -> tuple[list[dict], dict]:
+    """Auto-mode sub-menu: auto roles (default) or custom role assignment."""
+    console.print("\n[bold]Role assignment:[/]")
+    console.print("  [cyan][1][/] Auto — use pre-assigned roles [dim](recommended)[/]")
+    console.print("  [cyan][2][/] Custom — choose which role each model plays\n")
+
+    role_choice = Prompt.ask("Choice", choices=["1", "2"], default="1")
+
+    if role_choice == "1":
+        return sub_models, master_model
+
+    # Custom role assignment on the auto model set
+    sub_copy = [dict(m) for m in sub_models]
+    sub_copy = await _pick_roles_for_models(sub_copy)
+    return sub_copy, master_model
+
+
 async def configure_models(api_key: str) -> tuple[list[dict], dict]:
     """Interactive model + role configuration. Returns (sub_models, master_model)."""
     console.print("\n[bold]Model configuration:[/]")
-    console.print("  [cyan][1][/] Auto — use default 5 sub-models with pre-assigned roles [dim](recommended)[/]")
-    console.print("  [cyan][2][/] Custom — choose models and assign roles manually\n")
+    console.print("  [cyan][1][/] Auto (free)     — free models with pre-assigned roles [dim](recommended)[/]")
+    console.print("  [cyan][2][/] Auto (non-free)  — higher-quality paid models")
+    console.print("  [cyan][3][/] Custom           — choose models and assign roles manually\n")
 
-    choice = Prompt.ask("Choice", choices=["1", "2"], default="1")
+    choice = Prompt.ask("Choice", choices=["1", "2", "3"], default="1")
 
     if choice == "1":
-        return DEFAULT_SUB_MODELS, DEFAULT_MASTER_MODEL
+        return await _auto_configure(
+            [dict(m) for m in DEFAULT_SUB_MODELS], dict(DEFAULT_MASTER_MODEL)
+        )
+
+    if choice == "2":
+        return await _auto_configure(
+            [dict(m) for m in DEFAULT_NONFREE_SUB_MODELS], dict(DEFAULT_NONFREE_MASTER_MODEL)
+        )
 
     # Custom mode — fetch all available models
     console.print("\n[dim]Fetching available models from OpenRouter...[/]")
@@ -158,7 +223,7 @@ async def configure_models(api_key: str) -> tuple[list[dict], dict]:
         if indices is None or len(indices) != 5:
             console.print("[red]Please enter exactly 5 valid numbers.[/]")
             continue
-        sub_models = [dict(all_models[i - 1]) for i in indices]  # copy dicts — we'll add roles
+        sub_models = [dict(all_models[i - 1]) for i in indices]
         break
 
     # Pick master model
@@ -171,39 +236,18 @@ async def configure_models(api_key: str) -> tuple[list[dict], dict]:
         master_model = all_models[indices[0] - 1]
         break
 
-    # Assign a cognitive role to each sub-model
-    console.print("\n[bold]Assign a cognitive role to each sub-model:[/]\n")
-    display_roles()
-    console.print()
+    # Role assignment sub-menu
+    console.print("\n[bold]Role assignment:[/]")
+    console.print("  [cyan][1][/] Auto — assign roles automatically")
+    console.print("  [cyan][2][/] Custom — choose which role each model plays\n")
 
-    assigned_roles: list[str] = []
-    remaining_roles = list(ROLE_NAMES)  # enforce each role used exactly once
+    role_choice = Prompt.ask("Choice", choices=["1", "2"], default="1")
 
-    for i, m in enumerate(sub_models):
-        # Show which roles are still available
-        available = [(j + 1, r) for j, r in enumerate(ROLE_NAMES) if r in remaining_roles]
-        available_str = "  ".join(
-            f"[{ROLES[r]['color']}][{idx}] {r}[/]" for idx, r in available
-        )
-        console.print(f"[bold]Sub-model {i + 1}:[/] {m['label']}")
-        console.print(f"Available: {available_str}")
-
-        valid_nums = [str(idx) for idx, _ in available]
-        while True:
-            raw = Prompt.ask(f"  Role for {m['label']}", choices=valid_nums)
-            selected_role = ROLE_NAMES[int(raw) - 1]
-            if selected_role not in remaining_roles:
-                console.print("[red]That role is already taken. Pick another.[/]")
-                continue
-            assigned_roles.append(selected_role)
-            remaining_roles.remove(selected_role)
-            break
-
-        console.print()
-
-    # Attach roles to sub-model dicts
-    for m, role in zip(sub_models, assigned_roles):
-        m["role"] = role
+    if role_choice == "1":
+        for m, role in zip(sub_models, ROLE_NAMES):
+            m["role"] = role
+    else:
+        sub_models = await _pick_roles_for_models(sub_models)
 
     # Confirm
     console.print("[bold]Selected configuration:[/]")
