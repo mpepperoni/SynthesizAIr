@@ -61,6 +61,8 @@ from config import (
     CATEGORIES,
     CATEGORY_NAMES,
     DEFAULT_MASTER_MODEL,
+    DEFAULT_NONFREE_MASTER_MODEL,
+    DEFAULT_NONFREE_SUB_MODELS,
     DEFAULT_SUB_MODELS,
     DISAGREEMENT_ABSENT_MARKER,
     OPENROUTER_CHAT_ENDPOINT,
@@ -1146,20 +1148,28 @@ def cmd_generate(args: argparse.Namespace) -> None:
             console.print("[bold red]No prompts match the specified categories.[/]")
             sys.exit(1)
 
+    # Select tier defaults
+    if args.tier == "paid":
+        tier_sub_models = DEFAULT_NONFREE_SUB_MODELS
+        tier_master_model = DEFAULT_NONFREE_MASTER_MODEL
+    else:
+        tier_sub_models = DEFAULT_SUB_MODELS
+        tier_master_model = DEFAULT_MASTER_MODEL
+
     # Build model pool
     if args.model_pool:
         model_pool = [{"id": mid, "label": mid.split("/")[-1]} for mid in args.model_pool]
     else:
         model_pool = [
             {"id": m["id"], "label": m["label"]}
-            for m in DEFAULT_SUB_MODELS
+            for m in tier_sub_models
         ]
 
     # Resolve master model
     if args.master:
         master_model = {"id": args.master, "label": args.master.split("/")[-1]}
     else:
-        master_model = dict(DEFAULT_MASTER_MODEL)
+        master_model = dict(tier_master_model)
 
     # Parse phases
     phases = [int(p) for p in args.phases.split(",")] if args.phases else [1, 2, 3]
@@ -1168,6 +1178,8 @@ def cmd_generate(args: argparse.Namespace) -> None:
     role_pool = list(ROLE_NAMES)
 
     console.print(f"\n[bold cyan]SynthesizAIr Matrix Generator[/]")
+    tier_label = "[green]free[/]" if args.tier == "free" else "[yellow]paid[/]"
+    console.print(f"  Tier         : {tier_label}")
     console.print(f"  Model pool   : {len(model_pool)} models")
     for m in model_pool:
         console.print(f"    {m['label']} ({m['id']})")
@@ -1270,15 +1282,21 @@ def main() -> None:
     )
     gen_parser.add_argument("json_file", help="Path to JSON prompts file")
     gen_parser.add_argument(
+        "--tier",
+        choices=["free", "paid"],
+        default="free",
+        help="Model tier for defaults: 'free' or 'paid' (default: free)",
+    )
+    gen_parser.add_argument(
         "--model-pool",
         nargs="+",
         metavar="MODEL_ID",
-        help="Model IDs for the pool (default: the 5 default sub-models)",
+        help="Model IDs for the pool (overrides --tier for sub-models)",
     )
     gen_parser.add_argument(
         "--master",
         metavar="MODEL_ID",
-        help="Master model ID (default: built-in master)",
+        help="Master model ID (overrides --tier for master)",
     )
     gen_parser.add_argument(
         "--phases",
