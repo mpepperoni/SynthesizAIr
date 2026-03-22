@@ -1,33 +1,100 @@
 # SynthesizAIr
 
-A multi-model AI orchestration system that leverages five cognitively-distinct sub-models to synthesize sophisticated, multi-perspective answers to complex questions. Instead of relying on a single model, SynthesizAIr distributes a question across specialized models, identifies disagreements, and reconciles perspectives into a unified final answer.
+> *Stop opening five browser tabs. Let them argue it out for you.*
+
+A multi-model AI orchestration system that routes a single question through five cognitively distinct sub-models in parallel, detects where they disagree, then has a master model synthesize all perspectives into one authoritative answer.
+
+Built by [@mpepperoni](https://github.com/mpepperoni) — contributions welcome.
+
+---
+
+## Why This Exists
+
+Anyone who uses LLMs seriously knows the workflow: open ChatGPT, ask a question, open Claude, ask the same question, maybe check one more. Then mentally synthesize the differences yourself.
+
+That last step — the synthesis — is where the real value is. And it's the part you're doing manually.
+
+SynthesizAIr automates it. Five models, five cognitive lenses, one synthesized answer. The disagreements between models aren't noise — they're signal. The tool surfaces them explicitly rather than papering over them.
+
+This is an early-stage project. The goal isn't to compete with Poe or OpenRouter's playground — it's to give the community a foundation to build on. Fork it, extend it, make it better.
+
+---
 
 ## How It Works
 
 SynthesizAIr runs a three-phase pipeline:
 
-1. **Parallel Sub-Model Queries** — Five sub-models, each assigned a distinct cognitive role, process the question simultaneously alongside a master model's independent view.
-2. **Disagreement Detection** — The master model reviews all responses and identifies substantive tensions between perspectives.
-3. **Final Synthesis** — The master model reconciles all perspectives, guided by category-specific weighting, into one definitive answer.
+```
+Phase 1  →  Five sub-models process your question simultaneously
+            Each model is assigned a distinct cognitive role
+            All calls are async — no waiting for one to finish before the next starts
 
-### Cognitive Roles
+Phase 1.5 →  Disagreement detection
+             Master model reviews all five outputs
+             Identifies substantive tensions between perspectives
+             (Most ensemble tools skip this step — this one doesn't)
 
-| Role | Focus |
-|------|-------|
-| **Analytical** | Logical, evidence-based, systematic reasoning |
-| **Devil's Advocate** | Challenges assumptions, surfaces counterarguments |
-| **Creative** | Lateral thinking, novel framings, unexpected angles |
-| **Pragmatist** | Real-world focus, practical constraints, actionable advice |
-| **Synthesizer** | Connects ideas, finds meta-patterns, reconciles tensions |
+Phase 2  →  Master synthesis
+            Reconciles all perspectives into one final answer
+            Weighted by prompt category
+            Disagreements surfaced explicitly, not buried
+```
+
+### The Role System
+
+The role system is what separates this from just running the same prompt five times. Each sub-model is given a cognitive persona that genuinely changes how it approaches the question:
+
+| Role | What It Does |
+|---|---|
+| **Analytical** | Systematic, evidence-based breakdown. Components, logic, structure. |
+| **Devil's Advocate** | Actively challenges assumptions. Asks what could go wrong, what's being glossed over. |
+| **Creative** | Lateral thinking, unexpected angles, "what if" framings. |
+| **Pragmatist** | Cuts theory. Focuses on what actually works in the real world. |
+| **Synthesizer** | Finds the common thread. Reduces complexity. Distills to essentials. |
+
+The Devil's Advocate role in particular tends to surface the uncomfortable truths that a single LLM query would soften or skip entirely.
 
 ### Prompt Categories
 
-Questions can be categorized to adjust how the master model weights each role:
+Selecting a category adjusts how the master model weights each role during synthesis:
 
-- **Strategy/Planning** — Weighs Pragmatist highest
-- **Research/Synthesis** — Weighs Analytical highest
-- **Analysis/Evaluation** — Weighs Analytical and Devil's Advocate highest
-- **Creative/Brainstorming** — Weighs Creative highest
+| Category | Highest Weight |
+|---|---|
+| Strategy/Planning | Pragmatist + Devil's Advocate |
+| Research/Synthesis | Analytical |
+| Analysis/Evaluation | Analytical + Devil's Advocate |
+| Creative/Brainstorming | Creative |
+
+---
+
+## Early Findings
+
+Two test runs conducted against free-tier OpenRouter models. These are real outputs, not cherry-picked demos.
+
+### Run 1 — Authentic Chinese Noodle Recipe (Creative/Brainstorming)
+
+Five models diverged immediately on dish choice — Analytical went Lanzhou beef noodle soup, Creative went Dan Dan noodles, Pragmatist focused on accessible substitutions. The master synthesized a hybrid: Lanzhou broth architecture with a Dan Dan sesame-chili sauce layer. It attributed each element to the sub-model that contributed it. The result was a coherent, cookable recipe that no single model produced independently.
+
+**Key observation:** Role diversity mattered more than model diversity here. The Creative role's willingness to pick a completely different dish gave the master real material to work with.
+
+### Run 2 — Career Transition: Technical Trade → Network Engineering (Strategy/Planning)
+
+The Devil's Advocate role produced the most valuable output in this run. While other models gave structured, encouraging advice about certifications and skill gaps, the Devil's Advocate pushed back hard on the certification-first mindset — arguing that a CCNA without hands-on depth is just paper, and that real transition means building systems thinking, not collecting credentials.
+
+The master synthesis incorporated this tension explicitly, pairing each recommendation with a risk column drawn from the Devil's Advocate output.
+
+**Key observation:** The Devil's Advocate role's effectiveness scales with prompt stakes. Career decisions have real consequences. The role produced more valuable output here than it did on the recipe prompt, where "authenticity" is philosophical rather than consequential.
+
+**Early hypothesis for batch testing:** Devil's Advocate role impact likely correlates with category:
+```
+High impact   →  Strategy/Planning, Analysis/Evaluation
+Medium impact →  Research/Synthesis
+Lower impact  →  Creative/Brainstorming
+```
+
+This is what the batch tester is designed to systematically verify.
+
+---
 
 ## Installation
 
@@ -35,24 +102,14 @@ Questions can be categorized to adjust how the master model weights each role:
 pip install -r requirements.txt
 ```
 
-### Requirements
+**Requirements:** Python 3.10+, an [OpenRouter](https://openrouter.ai/) API key (free tier works).
 
-- Python 3.10+
-- An [OpenRouter](https://openrouter.ai/) API key
-
-### Configuration
-
-Create a `.env` file in the project root:
-
-```
+```bash
+# .env file or environment variable
 OPENROUTER_API_KEY=sk-or-v1-<your-key-here>
 ```
 
-Or set it as an environment variable:
-
-```bash
-export OPENROUTER_API_KEY=sk-or-v1-<your-key-here>
-```
+---
 
 ## Usage
 
@@ -62,7 +119,11 @@ export OPENROUTER_API_KEY=sk-or-v1-<your-key-here>
 python synthesizer.py
 ```
 
-Starts a terminal UI where you can select categories, ask questions, and view live responses from all sub-models plus the final synthesis.
+Starts a terminal UI. Select a category, enter your question, watch all six models respond in real time, then get the synthesized answer.
+
+Two modes available at startup:
+- **Auto** — Uses default model/role assignments
+- **Custom** — Fetches full free model list from OpenRouter, assign any model to any role
 
 ### REST API
 
@@ -72,8 +133,7 @@ uvicorn api:app --reload
 
 Exposes three endpoints at `http://localhost:8000`:
 
-**POST /synthesize** — Run the full orchestration pipeline.
-
+**POST /synthesize**
 ```json
 {
   "prompt": "Should we focus on growth or profitability?",
@@ -81,11 +141,11 @@ Exposes three endpoints at `http://localhost:8000`:
 }
 ```
 
-**GET /models** — Returns available free models from OpenRouter and current defaults.
+**GET /models** — Available models and current defaults
 
-**GET /roles** — Returns role and category definitions.
+**GET /roles** — Role and category definitions
 
-Authentication is via the `X-OpenRouter-Key` header or the `OPENROUTER_API_KEY` environment variable.
+Auth via `X-OpenRouter-Key` header or `OPENROUTER_API_KEY` env var. Full interactive docs at `/docs`.
 
 ### Batch Testing
 
@@ -95,60 +155,38 @@ python batch_tester.py run test_prompts.json -o results.csv -c 2
 python batch_tester.py run test_prompts.json --no-judge
 ```
 
-Runs synthesis across multiple prompts and model combinations, optionally scoring results with a judge model. Outputs a CSV with detailed metrics.
-
-Options:
-- `-o/--output` — Output CSV file path
-- `-c/--concurrency` — Max parallel runs (default: 1)
-- `--judge` — Override judge model
-- `--no-judge` — Skip judge scoring
-
-Backward compatible: `python batch_tester.py test_prompts.json` still works.
+Runs synthesis across multiple prompts, optionally scoring with a judge model. Outputs CSV with detailed metrics per run.
 
 ### Matrix Experiments
 
 ```bash
+# Preview before spending credits
 python batch_tester.py generate test_prompts.json --dry-run
+
+# Run full matrix
 python batch_tester.py generate test_prompts.json --max-combinations 5 --phases 1,2,3
-python batch_tester.py generate test_prompts.json \
-    --model-pool mistralai/mistral-7b-instruct:free meta-llama/llama-3.2-3b-instruct:free \
-                 qwen/qwen3-4b:free microsoft/phi-3-mini-128k-instruct:free \
-                 deepseek/deepseek-r1-distill-qwen-1.5b:free \
-    --max-combinations 10 --categories "Strategy/Planning"
 ```
 
-Generates and runs a test matrix across three experiment phases:
+Runs three experiment phases:
 
-| Phase | Name | What it tests |
-|-------|------|---------------|
-| 1 | Role Isolation | Same model in all 5 slots, each with a different role |
-| 2 | Model Diversity | 5 different models, all assigned the same role |
-| 3 | Full Combination | Different models with different roles (standard setup, varied) |
+| Phase | Name | Tests |
+|---|---|---|
+| 1 | Role Isolation | Same model × 5, all different roles — does the role system actually work? |
+| 2 | Model Diversity | Different models, same role — does model choice matter independently? |
+| 3 | Full Combination | Different models + different roles — what's the winning config? |
 
-Before running, a `test_matrix.json` preview is written showing every combination and the estimated API call count so you can confirm before spending credits.
+Generates a `test_matrix.json` preview showing every combination and estimated API call count before executing. Budget cap via `--max-combinations` prevents runaway costs.
 
-After all runs, a summary reports:
-- Best combination per prompt category and overall
-- Phase 1 finding: did roles produce meaningfully different outputs?
-- Phase 2 finding: which model performed most consistently?
-- Phase 3 finding: winning full combination
+After all runs, summary reports best combination per category, per phase findings, and overall winner.
 
-Options:
-- `--model-pool` — Model IDs to draw from (default: the 5 built-in sub-models)
-- `--master` — Master model ID
-- `--phases` — Comma-separated phase numbers (default: `1,2,3`)
-- `--max-combinations` — Budget cap per phase (default: 10)
-- `--categories` — Filter prompts to specific categories
-- `--preview` — Path for the preview JSON (default: `test_matrix.json`)
-- `--dry-run` — Generate preview without executing
-- Plus all standard batch options (`-o`, `-c`, `--judge`, `--no-judge`)
+---
 
 ## Default Models
 
 All defaults use free-tier OpenRouter models:
 
 | Role | Model |
-|------|-------|
+|---|---|
 | Analytical | Nemotron Nano 30B |
 | Devil's Advocate | Step 3.5 Flash |
 | Creative | MiniMax M2.5 |
@@ -156,14 +194,33 @@ All defaults use free-tier OpenRouter models:
 | Synthesizer | Trinity Large |
 | **Master** | **Nemotron Super 120B** |
 
-Models can be customized at runtime through the CLI, API request body, or batch test JSON.
+All models swappable at runtime via CLI, API, or batch config.
+
+---
+
+## Project Structure
+
+```
+├── orchestrator.py     # Core async pipeline: Phase 1 → 1.5 → 2
+├── synthesizer.py      # Interactive CLI with Rich terminal UI
+├── batch_tester.py     # Batch evaluation + combination generator + judge scoring
+├── api.py              # FastAPI wrapper (no business logic duplication)
+├── config.py           # Models, roles, categories, prompts, hyperparameters
+├── test_prompts.json   # 8 sample prompts across 4 categories
+├── requirements.txt
+└── LICENSE             # GPL-3.0
+```
+
+The architecture is intentionally layered — `orchestrator.py` contains all business logic, `synthesizer.py` and `api.py` are thin wrappers. Adding a web UI means touching only `api.py`.
+
+---
 
 ## Configuration Reference
 
 Key settings in `config.py`:
 
 | Setting | Default | Description |
-|---------|---------|-------------|
+|---|---|---|
 | `REQUEST_TIMEOUT_SECONDS` | 60 | Timeout per API call |
 | `MAX_TOKENS_SUB` | 1024 | Max tokens for sub-model responses |
 | `MAX_TOKENS_MASTER` | 2048 | Max tokens for master synthesis |
@@ -171,19 +228,44 @@ Key settings in `config.py`:
 | `TEMPERATURE_SUB` | 0.7 | Creativity for sub-models |
 | `TEMPERATURE_MASTER` | 0.3 | Precision for master model |
 
-## Project Structure
+---
 
-```
-├── api.py              # FastAPI REST interface
-├── orchestrator.py     # Core multi-model orchestration pipeline
-├── synthesizer.py      # Interactive CLI with rich terminal UI
-├── batch_tester.py     # Batch evaluation harness with judge scoring
-├── config.py           # Models, roles, categories, prompts, hyperparameters
-├── test_prompts.json   # Sample test prompts
-├── requirements.txt    # Python dependencies
-└── LICENSE             # GPL-3.0
-```
+## Roadmap
+
+- [ ] Web UI (React frontend over existing FastAPI)
+- [ ] Combination generator results dashboard
+- [ ] Per-category optimal config recommendations from batch testing
+- [ ] Role/category fit scoring dimension in batch tester
+- [ ] Persistent run history and comparison
+
+---
+
+## Where This Works Best
+
+SynthesizAIr's value scales with question complexity and ambiguity. The more a question benefits from multiple perspectives, the more the ensemble approach pays off.
+
+**High value:** Business strategy, career decisions, research synthesis, complex tradeoff analysis, anything where "it depends" is the honest answer.
+
+**Lower value:** Simple factual lookups, math, code execution, highly personal/contextual questions.
+
+If your question has a single correct answer, this is overkill. If your question has five defensible answers and you need to think through all of them — this is the tool.
+
+---
+
+## Contributing
+
+Early stage, all contributions welcome. Some natural starting points:
+
+- Additional cognitive roles
+- Web UI implementation
+- Improved master synthesis prompt
+- Role/category fit scoring
+- Alternative LLM provider support beyond OpenRouter
+
+Open an issue or submit a PR.
+
+---
 
 ## License
 
-This project is licensed under the [GNU General Public License v3.0](LICENSE).
+[GNU General Public License v3.0](LICENSE)
