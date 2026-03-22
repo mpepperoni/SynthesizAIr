@@ -147,6 +147,20 @@ DEFAULT_MASTER_MODEL = {
     "label": "Nemotron Super 120B (Master)",
 }
 
+# Non-free (paid) default lineup — higher-quality models
+DEFAULT_NONFREE_SUB_MODELS = [
+    {"id": "anthropic/claude-sonnet-4",             "label": "Claude Sonnet 4",        "role": "Analytical"},
+    {"id": "google/gemini-2.5-pro-preview",         "label": "Gemini 2.5 Pro",         "role": "Devil's Advocate"},
+    {"id": "openai/gpt-4.1",                        "label": "GPT-4.1",                "role": "Creative"},
+    {"id": "meta-llama/llama-4-maverick",           "label": "Llama 4 Maverick",       "role": "Pragmatist"},
+    {"id": "deepseek/deepseek-r1",                  "label": "DeepSeek R1",            "role": "Synthesizer"},
+]
+
+DEFAULT_NONFREE_MASTER_MODEL = {
+    "id": "anthropic/claude-sonnet-4",
+    "label": "Claude Sonnet 4 (Master)",
+}
+
 # ---------------------------------------------------------------------------
 # Request settings
 # ---------------------------------------------------------------------------
