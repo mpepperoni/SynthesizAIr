@@ -70,7 +70,11 @@ async def fetch_models(api_key: str) -> list[dict]:
             response.raise_for_status()
             data = response.json()
             models = [
-                {"id": m["id"], "label": m.get("name", m["id"])}
+                {
+                    "id": m["id"],
+                    "label": m.get("name", m["id"]),
+                    "pricing": m.get("pricing", {}),
+                }
                 for m in data.get("data", [])
             ]
             models.sort(key=lambda m: m["label"].lower())
@@ -78,6 +82,22 @@ async def fetch_models(api_key: str) -> list[dict]:
         except Exception as e:
             console.print(f"[yellow]Warning: Could not fetch model list: {e}[/]")
             return []
+
+
+async def fetch_model_pricing(api_key: str) -> dict[str, dict[str, float]]:
+    """Fetch pricing for all models. Returns {model_id: {"prompt": $, "completion": $}}."""
+    models = await fetch_models(api_key)
+    pricing: dict[str, dict[str, float]] = {}
+    for m in models:
+        p = m.get("pricing", {})
+        try:
+            pricing[m["id"]] = {
+                "prompt": float(p.get("prompt", "0")),
+                "completion": float(p.get("completion", "0")),
+            }
+        except (ValueError, TypeError):
+            pricing[m["id"]] = {"prompt": 0.0, "completion": 0.0}
+    return pricing
 
 
 def display_model_list(models: list[dict]) -> None:
