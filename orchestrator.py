@@ -30,6 +30,30 @@ class ModelResult:
     role: str = ""
 
 
+def _build_request_headers(api_key: str) -> dict:
+    return {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/local/synthesizair",
+        "X-Title": "SynthesizAIr",
+    }
+
+
+def _fold_system_into_user(messages: list[dict]) -> list[dict]:
+    """Move the system prompt into the first user message as a preamble."""
+    system_parts = [m["content"] for m in messages if m["role"] == "system"]
+    other = [m for m in messages if m["role"] != "system"]
+    if not system_parts or not other:
+        return other or messages
+    preamble = "\n\n".join(system_parts)
+    result = list(other)
+    result[0] = {
+        "role": result[0]["role"],
+        "content": f"[INSTRUCTIONS]\n{preamble}\n[/INSTRUCTIONS]\n\n{result[0]['content']}",
+    }
+    return result
+
+
 async def call_model(
     client: httpx.AsyncClient,
     model: dict,
@@ -46,16 +70,12 @@ async def call_model(
     else:
         full_messages = messages
 
+    headers = _build_request_headers(api_key)
     start = time.monotonic()
     try:
         response = await client.post(
             OPENROUTER_CHAT_ENDPOINT,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/local/synthesizair",
-                "X-Title": "SynthesizAIr",
-            },
+            headers=headers,
             json={
                 "model": model["id"],
                 "messages": full_messages,
@@ -69,6 +89,35 @@ async def call_model(
         content = data["choices"][0]["message"]["content"]
         return ModelResult(model["id"], model["label"], content, None, time.monotonic() - start, role)
     except httpx.HTTPStatusError as e:
+        # Some models (e.g. Gemma) reject system/developer messages with a 400.
+        # Retry by folding the system prompt into the user message instead.
+        if e.response.status_code == 400 and any(
+            hint in e.response.text.lower()
+            for hint in ("developer instruction", "system message", "system role", "system prompt")
+        ):
+            fallback_messages = _fold_system_into_user(full_messages)
+            try:
+                response = await client.post(
+                    OPENROUTER_CHAT_ENDPOINT,
+                    headers=headers,
+                    json={
+                        "model": model["id"],
+                        "messages": fallback_messages,
+                        "max_tokens": max_tokens,
+                        "temperature": temperature,
+                    },
+                    timeout=REQUEST_TIMEOUT_SECONDS,
+                )
+                response.raise_for_status()
+                data = response.json()
+                content = data["choices"][0]["message"]["content"]
+                return ModelResult(model["id"], model["label"], content, None, time.monotonic() - start, role)
+            except Exception as e2:
+                return ModelResult(
+                    model["id"], model["label"], None,
+                    f"Fallback also failed: {e2}",
+                    time.monotonic() - start, role,
+                )
         return ModelResult(
             model["id"], model["label"], None,
             f"HTTP {e.response.status_code}: {e.response.text[:200]}",

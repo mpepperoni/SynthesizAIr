@@ -34,7 +34,7 @@ from config import (
     ROLES,
 )
 from orchestrator import ModelResult, run_synthesis
-from synthesizer import fetch_free_models
+from synthesizer import fetch_free_models, fetch_models
 
 # ---------------------------------------------------------------------------
 # App
@@ -239,7 +239,7 @@ class DefaultModels(BaseModel):
 class ModelsResponse(BaseModel):
     defaults: DefaultModels
     available: list[ModelEntry] = Field(
-        description="All :free models from OpenRouter, sorted by name. Empty if the fetch failed."
+        description="All models from OpenRouter, sorted by name. Empty if the fetch failed."
     )
     available_fetch_error: bool = Field(
         default=False,
@@ -250,10 +250,10 @@ class ModelsResponse(BaseModel):
 @app.get(
     "/models",
     response_model=ModelsResponse,
-    summary="List available OpenRouter free models and the current default lineup",
+    summary="List available OpenRouter models and the current default lineup",
 )
 async def list_models(api_key: str = Depends(resolve_api_key)) -> ModelsResponse:
-    available = await fetch_free_models(api_key)
+    available = await fetch_models(api_key)
     return ModelsResponse(
         defaults=DefaultModels(
             sub_models=list(DEFAULT_SUB_MODELS),

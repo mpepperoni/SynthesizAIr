@@ -52,6 +52,12 @@ def role_markup(role: str) -> str:
 
 async def fetch_free_models(api_key: str) -> list[dict]:
     """Fetch all :free models from OpenRouter and return sorted list."""
+    all_models = await fetch_models(api_key)
+    return [m for m in all_models if m["id"].endswith(":free")]
+
+
+async def fetch_models(api_key: str) -> list[dict]:
+    """Fetch all models from OpenRouter and return sorted list."""
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(
@@ -61,13 +67,12 @@ async def fetch_free_models(api_key: str) -> list[dict]:
             )
             response.raise_for_status()
             data = response.json()
-            free_models = [
+            models = [
                 {"id": m["id"], "label": m.get("name", m["id"])}
                 for m in data.get("data", [])
-                if m["id"].endswith(":free")
             ]
-            free_models.sort(key=lambda m: m["label"].lower())
-            return free_models
+            models.sort(key=lambda m: m["label"].lower())
+            return models
         except Exception as e:
             console.print(f"[yellow]Warning: Could not fetch model list: {e}[/]")
             return []
@@ -78,8 +83,10 @@ def display_model_list(models: list[dict]) -> None:
     table.add_column("#", style="dim", width=4)
     table.add_column("Label")
     table.add_column("Model ID", style="dim")
+    table.add_column("Tier", width=6)
     for i, m in enumerate(models, 1):
-        table.add_row(str(i), m["label"], m["id"])
+        tier = "[green]free[/]" if m["id"].endswith(":free") else "[dim]paid[/]"
+        table.add_row(str(i), m["label"], m["id"], tier)
     console.print(table)
 
 
@@ -94,14 +101,18 @@ def display_roles() -> None:
     console.print(table)
 
 
-def select_category() -> str:
-    """Prompt the user to pick a prompt category. Returns the category name."""
+def select_category() -> str | None:
+    """Prompt the user to pick a prompt category. Returns the category name, or None to quit."""
     console.print("\n[bold]Prompt category:[/]")
     for i, name in enumerate(CATEGORY_NAMES, 1):
         color = CATEGORIES[name]["color"]
         desc = CATEGORIES[name]["description"]
         console.print(f"  [cyan][{i}][/] [{color}]{name}[/]  [dim]{desc}[/]")
-    choice = Prompt.ask("\nCategory", choices=[str(i) for i in range(1, len(CATEGORY_NAMES) + 1)])
+    console.print(f"  [dim][q][/] [dim]Quit[/]")
+    valid = [str(i) for i in range(1, len(CATEGORY_NAMES) + 1)] + ["q"]
+    choice = Prompt.ask("\nCategory", choices=valid)
+    if choice == "q":
+        return None
     return CATEGORY_NAMES[int(choice) - 1]
 
 
@@ -127,37 +138,37 @@ async def configure_models(api_key: str) -> tuple[list[dict], dict]:
     if choice == "1":
         return DEFAULT_SUB_MODELS, DEFAULT_MASTER_MODEL
 
-    # Custom mode — fetch free model list
-    console.print("\n[dim]Fetching available free models from OpenRouter...[/]")
-    free_models = await fetch_free_models(api_key)
+    # Custom mode — fetch all available models
+    console.print("\n[dim]Fetching available models from OpenRouter...[/]")
+    all_models = await fetch_models(api_key)
 
-    if not free_models:
+    if not all_models:
         console.print("[yellow]Could not load model list. Falling back to defaults.[/]")
         return DEFAULT_SUB_MODELS, DEFAULT_MASTER_MODEL
 
-    console.print(f"\n[bold]Available free models[/] ({len(free_models)} total):\n")
-    display_model_list(free_models)
+    console.print(f"\n[bold]Available models[/] ({len(all_models)} total):\n")
+    display_model_list(all_models)
 
     # Pick 5 sub-models
     while True:
         raw = Prompt.ask(
             "\nPick [bold]5 sub-models[/] (comma-separated numbers, e.g. [dim]1,3,7,12,15[/])"
         )
-        indices = parse_indices(raw, len(free_models))
+        indices = parse_indices(raw, len(all_models))
         if indices is None or len(indices) != 5:
             console.print("[red]Please enter exactly 5 valid numbers.[/]")
             continue
-        sub_models = [dict(free_models[i - 1]) for i in indices]  # copy dicts — we'll add roles
+        sub_models = [dict(all_models[i - 1]) for i in indices]  # copy dicts — we'll add roles
         break
 
     # Pick master model
     while True:
         raw = Prompt.ask("\nPick [bold]1 master model[/] (single number)")
-        indices = parse_indices(raw, len(free_models))
+        indices = parse_indices(raw, len(all_models))
         if indices is None or len(indices) != 1:
             console.print("[red]Please enter exactly 1 valid number.[/]")
             continue
-        master_model = free_models[indices[0] - 1]
+        master_model = all_models[indices[0] - 1]
         break
 
     # Assign a cognitive role to each sub-model
@@ -373,6 +384,9 @@ async def main() -> None:
     while True:
         try:
             category = select_category()
+            if category is None:
+                console.print("[dim]Goodbye.[/]")
+                break
             prompt = Prompt.ask("\n[bold green]>[/]")
         except (KeyboardInterrupt, EOFError):
             console.print("\n[dim]Goodbye.[/]")
