@@ -101,14 +101,18 @@ def display_roles() -> None:
     console.print(table)
 
 
-def select_category() -> str:
-    """Prompt the user to pick a prompt category. Returns the category name."""
+def select_category() -> str | None:
+    """Prompt the user to pick a prompt category. Returns the category name, or None to quit."""
     console.print("\n[bold]Prompt category:[/]")
     for i, name in enumerate(CATEGORY_NAMES, 1):
         color = CATEGORIES[name]["color"]
         desc = CATEGORIES[name]["description"]
         console.print(f"  [cyan][{i}][/] [{color}]{name}[/]  [dim]{desc}[/]")
-    choice = Prompt.ask("\nCategory", choices=[str(i) for i in range(1, len(CATEGORY_NAMES) + 1)])
+    console.print(f"  [dim][q][/] [dim]Quit[/]")
+    valid = [str(i) for i in range(1, len(CATEGORY_NAMES) + 1)] + ["q"]
+    choice = Prompt.ask("\nCategory", choices=valid)
+    if choice == "q":
+        return None
     return CATEGORY_NAMES[int(choice) - 1]
 
 
@@ -380,6 +384,9 @@ async def main() -> None:
     while True:
         try:
             category = select_category()
+            if category is None:
+                console.print("[dim]Goodbye.[/]")
+                break
             prompt = Prompt.ask("\n[bold green]>[/]")
         except (KeyboardInterrupt, EOFError):
             console.print("\n[dim]Goodbye.[/]")
