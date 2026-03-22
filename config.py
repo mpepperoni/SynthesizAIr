@@ -135,16 +135,16 @@ CATEGORY_NAMES: list[str] = list(CATEGORIES.keys())
 # ---------------------------------------------------------------------------
 
 DEFAULT_SUB_MODELS = [
-    {"id": "mistralai/mistral-7b-instruct:free",          "label": "Mistral 7B",        "role": "Analytical"},
-    {"id": "meta-llama/llama-3.2-3b-instruct:free",       "label": "Llama 3.2 3B",      "role": "Devil's Advocate"},
-    {"id": "qwen/qwen3-4b:free",                           "label": "Qwen3 4B",           "role": "Creative"},
-    {"id": "microsoft/phi-3-mini-128k-instruct:free",     "label": "Phi-3 Mini",         "role": "Pragmatist"},
-    {"id": "deepseek/deepseek-r1-distill-qwen-1.5b:free", "label": "DeepSeek R1 1.5B",   "role": "Synthesizer"},
+    {"id": "nvidia/nemotron-3-nano-30b-a3b:free",      "label": "Nemotron Nano 30B",    "role": "Analytical"},
+    {"id": "stepfun/step-3.5-flash:free",               "label": "Step 3.5 Flash",       "role": "Devil's Advocate"},
+    {"id": "minimax/minimax-m2.5:free",                  "label": "MiniMax M2.5",          "role": "Creative"},
+    {"id": "liquid/lfm-2.5-1.2b-instruct:free",         "label": "LFM 1.2B Instruct",    "role": "Pragmatist"},
+    {"id": "arcee-ai/trinity-large-preview:free",        "label": "Trinity Large",         "role": "Synthesizer"},
 ]
 
 DEFAULT_MASTER_MODEL = {
-    "id": "mistralai/mistral-small-3.1-24b-instruct:free",
-    "label": "Mistral Small 24B (Master)",
+    "id": "nvidia/nemotron-3-super-120b-a12b:free",
+    "label": "Nemotron Super 120B (Master)",
 }
 
 # ---------------------------------------------------------------------------

@@ -149,12 +149,12 @@ All defaults use free-tier OpenRouter models:
 
 | Role | Model |
 |------|-------|
-| Analytical | Mistral 7B |
-| Devil's Advocate | Llama 3.2 3B |
-| Creative | Qwen3 4B |
-| Pragmatist | Phi-3 Mini |
-| Synthesizer | DeepSeek R1 1.5B |
-| **Master** | **Mistral Small 24B** |
+| Analytical | Nemotron Nano 30B |
+| Devil's Advocate | Step 3.5 Flash |
+| Creative | MiniMax M2.5 |
+| Pragmatist | LFM 1.2B Instruct |
+| Synthesizer | Trinity Large |
+| **Master** | **Nemotron Super 120B** |
 
 Models can be customized at runtime through the CLI, API request body, or batch test JSON.
 

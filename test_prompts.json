@@ -48,7 +48,7 @@
     }
   ],
   "judge_model": {
-    "id": "mistralai/mistral-small-3.1-24b-instruct:free",
-    "label": "Mistral Small 24B (Judge)"
+    "id": "nvidia/nemotron-3-super-120b-a12b:free",
+    "label": "Nemotron Super 120B (Judge)"
   }
 }
