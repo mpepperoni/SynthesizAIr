@@ -65,11 +65,15 @@ from config import (
     DEFAULT_NONFREE_SUB_MODELS,
     DEFAULT_SUB_MODELS,
     DISAGREEMENT_ABSENT_MARKER,
+    MAX_TOKENS_DISAGREEMENT,
+    MAX_TOKENS_MASTER,
+    MAX_TOKENS_SUB,
     OPENROUTER_CHAT_ENDPOINT,
     REQUEST_TIMEOUT_SECONDS,
     ROLE_NAMES,
 )
 from orchestrator import run_synthesis
+from synthesizer import fetch_model_pricing
 
 load_dotenv()
 
@@ -349,6 +353,68 @@ def generate_combinations(
     return entries
 
 
+def estimate_cost(
+    entries: list[dict],
+    prompts: list[TestPrompt],
+    master_model: dict,
+    judge_model: dict | None,
+    pricing: dict[str, dict[str, float]],
+    avg_prompt_tokens: int = 300,
+) -> dict:
+    """
+    Estimate the cost of a batch run using OpenRouter pricing.
+
+    Assumptions per prompt x combination run:
+      - 5 sub-model calls: ~avg_prompt_tokens in, MAX_TOKENS_SUB out each
+      - 1 master independent: ~avg_prompt_tokens in, MAX_TOKENS_SUB out
+      - 1 disagreement detection: ~(5 * MAX_TOKENS_SUB + avg_prompt_tokens) in, MAX_TOKENS_DISAGREEMENT out
+      - 1 synthesis: ~(5 * MAX_TOKENS_SUB + MAX_TOKENS_SUB + avg_prompt_tokens) in, MAX_TOKENS_MASTER out
+      - 1 judge call (if enabled): ~(5 * MAX_TOKENS_SUB + MAX_TOKENS_MASTER) in, JUDGE_MAX_TOKENS out
+
+    Returns dict with per-model breakdown and total.
+    """
+    total_cost = 0.0
+    model_costs: dict[str, float] = {}
+    unknown_models: set[str] = set()
+
+    def _add(model_id: str, input_tokens: int, output_tokens: int) -> float:
+        p = pricing.get(model_id, None)
+        if p is None:
+            unknown_models.add(model_id)
+            return 0.0
+        cost = p["prompt"] * input_tokens + p["completion"] * output_tokens
+        model_costs[model_id] = model_costs.get(model_id, 0.0) + cost
+        return cost
+
+    sub_responses_tokens = 5 * MAX_TOKENS_SUB
+    disagree_input = sub_responses_tokens + MAX_TOKENS_SUB + avg_prompt_tokens
+    synth_input = sub_responses_tokens + MAX_TOKENS_SUB + avg_prompt_tokens
+    judge_input = sub_responses_tokens + MAX_TOKENS_MASTER
+
+    for _ in prompts:
+        for e in entries:
+            combo = e["combination"]
+            # 5 sub-model calls
+            for sm in combo.sub_models:
+                total_cost += _add(sm["id"], avg_prompt_tokens, MAX_TOKENS_SUB)
+            # Master independent view
+            master_id = combo.master_model["id"]
+            total_cost += _add(master_id, avg_prompt_tokens, MAX_TOKENS_SUB)
+            # Disagreement detection (master)
+            total_cost += _add(master_id, disagree_input, MAX_TOKENS_DISAGREEMENT)
+            # Synthesis (master)
+            total_cost += _add(master_id, synth_input, MAX_TOKENS_MASTER)
+            # Judge
+            if judge_model:
+                total_cost += _add(judge_model["id"], judge_input, JUDGE_MAX_TOKENS)
+
+    return {
+        "total": total_cost,
+        "by_model": model_costs,
+        "unknown_models": unknown_models,
+    }
+
+
 def write_matrix_preview(
     entries: list[dict],
     prompts: list[TestPrompt],
@@ -404,6 +470,7 @@ def print_matrix_preview(
     entries: list[dict],
     prompts: list[TestPrompt],
     estimated_calls: int,
+    cost_estimate: dict | None = None,
 ) -> None:
     """Display the matrix preview in the terminal."""
     phase_counts: dict[str, int] = {}
@@ -418,6 +485,23 @@ def print_matrix_preview(
     console.print(f"  Total combinations: [yellow]{len(entries)}[/]")
     console.print(f"  Total runs        : [yellow]{len(prompts) * len(entries)}[/]")
     console.print(f"  Estimated API calls: [bold yellow]{estimated_calls}[/]")
+
+    if cost_estimate:
+        total = cost_estimate["total"]
+        if total > 0:
+            console.print(f"  Estimated cost    : [bold yellow]${total:.4f}[/] [dim](worst-case, max output tokens)[/]")
+            by_model = cost_estimate["by_model"]
+            if by_model:
+                console.print(f"\n  [dim]Cost breakdown by model:[/]")
+                for model_id, cost in sorted(by_model.items(), key=lambda x: -x[1]):
+                    console.print(f"    {model_id:<45} [yellow]${cost:.4f}[/]")
+        else:
+            console.print(f"  Estimated cost    : [green]$0.00 (free tier)[/]")
+        if cost_estimate.get("unknown_models"):
+            console.print(
+                f"  [dim yellow]Note: pricing unavailable for: "
+                f"{', '.join(cost_estimate['unknown_models'])}[/]"
+            )
 
     table = Table(header_style="bold magenta", show_lines=False, show_edge=True)
     table.add_column("ID", style="dim", width=8)
@@ -1200,13 +1284,20 @@ def cmd_generate(args: argparse.Namespace) -> None:
         console.print("[bold red]No combinations generated. Check model pool size and phases.[/]")
         sys.exit(1)
 
+    judge_model = _resolve_judge(args, default_judge)
+
+    # Fetch pricing and estimate cost
+    console.print("\n[dim]Fetching model pricing from OpenRouter...[/]")
+    pricing = asyncio.run(fetch_model_pricing(api_key))
+    cost_estimate = estimate_cost(entries, prompts, master_model, judge_model, pricing)
+
     # Write preview
     preview_path = args.preview or "test_matrix.json"
     estimated_calls = write_matrix_preview(
         entries, prompts, model_pool, master_model,
         args.categories, output_path=preview_path,
     )
-    print_matrix_preview(entries, prompts, estimated_calls)
+    print_matrix_preview(entries, prompts, estimated_calls, cost_estimate=cost_estimate)
     console.print(f"\n  Preview written to: [green]{preview_path}[/]")
 
     # Confirmation gate
@@ -1214,11 +1305,12 @@ def cmd_generate(args: argparse.Namespace) -> None:
         console.print("\n[dim]--dry-run: stopping before execution.[/]")
         return
 
+    cost_str = f", ~${cost_estimate['total']:.4f}" if cost_estimate["total"] > 0 else ""
     try:
         from rich.prompt import Prompt
         confirm = Prompt.ask(
             f"\nProceed with [bold]{len(prompts) * len(entries)}[/] runs "
-            f"(~[bold]{estimated_calls}[/] API calls)?",
+            f"(~[bold]{estimated_calls}[/] API calls{cost_str})?",
             choices=["y", "n"],
             default="y",
         )
@@ -1238,8 +1330,6 @@ def cmd_generate(args: argparse.Namespace) -> None:
         }
         for e in entries
     }
-
-    judge_model = _resolve_judge(args, default_judge)
     ts = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
     output_path = args.output or f"matrix_results_{ts}.csv"
 
