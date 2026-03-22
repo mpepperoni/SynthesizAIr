@@ -90,9 +90,9 @@ Authentication is via the `X-OpenRouter-Key` header or the `OPENROUTER_API_KEY` 
 ### Batch Testing
 
 ```bash
-python batch_tester.py test_prompts.json
-python batch_tester.py test_prompts.json -o results.csv -c 2
-python batch_tester.py test_prompts.json --no-judge
+python batch_tester.py run test_prompts.json
+python batch_tester.py run test_prompts.json -o results.csv -c 2
+python batch_tester.py run test_prompts.json --no-judge
 ```
 
 Runs synthesis across multiple prompts and model combinations, optionally scoring results with a judge model. Outputs a CSV with detailed metrics.
@@ -102,6 +102,46 @@ Options:
 - `-c/--concurrency` — Max parallel runs (default: 1)
 - `--judge` — Override judge model
 - `--no-judge` — Skip judge scoring
+
+Backward compatible: `python batch_tester.py test_prompts.json` still works.
+
+### Matrix Experiments
+
+```bash
+python batch_tester.py generate test_prompts.json --dry-run
+python batch_tester.py generate test_prompts.json --max-combinations 5 --phases 1,2,3
+python batch_tester.py generate test_prompts.json \
+    --model-pool mistralai/mistral-7b-instruct:free meta-llama/llama-3.2-3b-instruct:free \
+                 qwen/qwen3-4b:free microsoft/phi-3-mini-128k-instruct:free \
+                 deepseek/deepseek-r1-distill-qwen-1.5b:free \
+    --max-combinations 10 --categories "Strategy/Planning"
+```
+
+Generates and runs a test matrix across three experiment phases:
+
+| Phase | Name | What it tests |
+|-------|------|---------------|
+| 1 | Role Isolation | Same model in all 5 slots, each with a different role |
+| 2 | Model Diversity | 5 different models, all assigned the same role |
+| 3 | Full Combination | Different models with different roles (standard setup, varied) |
+
+Before running, a `test_matrix.json` preview is written showing every combination and the estimated API call count so you can confirm before spending credits.
+
+After all runs, a summary reports:
+- Best combination per prompt category and overall
+- Phase 1 finding: did roles produce meaningfully different outputs?
+- Phase 2 finding: which model performed most consistently?
+- Phase 3 finding: winning full combination
+
+Options:
+- `--model-pool` — Model IDs to draw from (default: the 5 built-in sub-models)
+- `--master` — Master model ID
+- `--phases` — Comma-separated phase numbers (default: `1,2,3`)
+- `--max-combinations` — Budget cap per phase (default: 10)
+- `--categories` — Filter prompts to specific categories
+- `--preview` — Path for the preview JSON (default: `test_matrix.json`)
+- `--dry-run` — Generate preview without executing
+- Plus all standard batch options (`-o`, `-c`, `--judge`, `--no-judge`)
 
 ## Default Models
 

@@ -35,8 +35,10 @@ import asyncio
 import csv
 import dataclasses
 import datetime
+import itertools
 import json
 import os
+import random
 import re
 import sys
 import time
@@ -57,11 +59,13 @@ from rich.table import Table
 
 from config import (
     CATEGORIES,
+    CATEGORY_NAMES,
     DEFAULT_MASTER_MODEL,
     DEFAULT_SUB_MODELS,
     DISAGREEMENT_ABSENT_MARKER,
     OPENROUTER_CHAT_ENDPOINT,
     REQUEST_TIMEOUT_SECONDS,
+    ROLE_NAMES,
 )
 from orchestrator import run_synthesis
 
@@ -190,6 +194,8 @@ class RunResult:
     scores: ScoreResult | None
     elapsed_seconds: float
     error: str | None
+    combination_id: str = ""
+    phase: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -226,6 +232,211 @@ def load_test_file(path: str) -> tuple[list[TestPrompt], list[Combination], dict
 
     judge_model = data.get("judge_model", dict(DEFAULT_MASTER_MODEL))
     return prompts, combinations, judge_model
+
+
+# ---------------------------------------------------------------------------
+# Combination matrix generator
+# ---------------------------------------------------------------------------
+
+
+def generate_combinations(
+    model_pool: list[dict],
+    role_pool: list[str] | None = None,
+    phases: list[int] | None = None,
+    max_combinations: int = 10,
+    master_model: dict | None = None,
+) -> list[dict]:
+    """
+    Generate test matrix combinations across three experiment phases.
+
+    Returns list of dicts with keys:
+        combination: Combination, combination_id: str, phase: int, phase_label: str
+    """
+    if role_pool is None:
+        role_pool = list(ROLE_NAMES)
+    if phases is None:
+        phases = [1, 2, 3]
+    if master_model is None:
+        master_model = dict(DEFAULT_MASTER_MODEL)
+
+    entries: list[dict] = []
+
+    # Phase 1: Same model × 5 slots, all different roles (role isolation test)
+    if 1 in phases:
+        p1: list[Combination] = []
+        for model in model_pool:
+            sub_models = [
+                {"id": model["id"], "label": model["label"], "role": role}
+                for role in role_pool[:5]
+            ]
+            p1.append(Combination(
+                name=f"P1-{model['label'][:20]}",
+                sub_models=sub_models,
+                master_model=dict(master_model),
+            ))
+        if len(p1) > max_combinations:
+            p1 = random.sample(p1, max_combinations)
+        for i, c in enumerate(p1):
+            entries.append({
+                "combination": c,
+                "combination_id": f"p1_{i + 1:03d}",
+                "phase": 1,
+                "phase_label": "Phase 1: Role Isolation",
+            })
+
+    # Phase 2: Different models × same role across all slots (model diversity test)
+    if 2 in phases:
+        if len(model_pool) < 5:
+            console.print("[yellow]Warning: Phase 2 requires ≥5 models in pool. Skipping.[/]")
+        else:
+            p2: list[Combination] = []
+            for role in role_pool[:5]:
+                for mg in itertools.combinations(model_pool, 5):
+                    sub_models = [
+                        {"id": m["id"], "label": m["label"], "role": role}
+                        for m in mg
+                    ]
+                    p2.append(Combination(
+                        name=f"P2-{role[:14]}",
+                        sub_models=sub_models,
+                        master_model=dict(master_model),
+                    ))
+            if len(p2) > max_combinations:
+                p2 = random.sample(p2, max_combinations)
+            # Deduplicate names by appending index
+            for i, c in enumerate(p2):
+                c.name = f"P2-{c.name.split('-', 1)[1]}-{i + 1:02d}"
+                entries.append({
+                    "combination": c,
+                    "combination_id": f"p2_{i + 1:03d}",
+                    "phase": 2,
+                    "phase_label": "Phase 2: Model Diversity",
+                })
+
+    # Phase 3: Different models × different roles (full combination test)
+    if 3 in phases:
+        if len(model_pool) < 5:
+            console.print("[yellow]Warning: Phase 3 requires ≥5 models in pool. Skipping.[/]")
+        else:
+            mg_list = list(itertools.combinations(model_pool, 5))
+            rp_list = list(itertools.permutations(role_pool[:5]))
+            candidates = list(itertools.product(mg_list, rp_list))
+            if len(candidates) > max_combinations:
+                candidates = random.sample(candidates, max_combinations)
+            p3: list[Combination] = []
+            for mg, rp in candidates:
+                sub_models = [
+                    {"id": mg[j]["id"], "label": mg[j]["label"], "role": rp[j]}
+                    for j in range(5)
+                ]
+                p3.append(Combination(
+                    name=f"P3-mix-{len(p3) + 1:02d}",
+                    sub_models=sub_models,
+                    master_model=dict(master_model),
+                ))
+            if len(p3) > max_combinations:
+                p3 = p3[:max_combinations]
+            for i, c in enumerate(p3):
+                entries.append({
+                    "combination": c,
+                    "combination_id": f"p3_{i + 1:03d}",
+                    "phase": 3,
+                    "phase_label": "Phase 3: Full Combination",
+                })
+
+    return entries
+
+
+def write_matrix_preview(
+    entries: list[dict],
+    prompts: list[TestPrompt],
+    model_pool: list[dict],
+    master_model: dict,
+    categories: list[str] | None,
+    output_path: str = "test_matrix.json",
+) -> int:
+    """
+    Write a preview JSON of the test matrix and return estimated API call count.
+
+    Per prompt × combination:
+      5 sub-model calls + 1 master initial + 1 disagreement detection + 1 synthesis + 1 judge = 9
+    """
+    calls_per_run = 9
+    total_runs = len(prompts) * len(entries)
+    estimated_calls = total_runs * calls_per_run
+
+    phase_counts: dict[str, int] = {}
+    for e in entries:
+        label = e["phase_label"]
+        phase_counts[label] = phase_counts.get(label, 0) + 1
+
+    preview = {
+        "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
+        "model_pool": model_pool,
+        "master_model": master_model,
+        "categories_filter": categories,
+        "prompts_count": len(prompts),
+        "phases": phase_counts,
+        "total_combinations": len(entries),
+        "total_runs": total_runs,
+        "estimated_api_calls": estimated_calls,
+        "combinations": [
+            {
+                "combination_id": e["combination_id"],
+                "phase": e["phase_label"],
+                "name": e["combination"].name,
+                "sub_models": e["combination"].sub_models,
+                "master_model": e["combination"].master_model,
+            }
+            for e in entries
+        ],
+    }
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(preview, f, indent=2)
+
+    return estimated_calls
+
+
+def print_matrix_preview(
+    entries: list[dict],
+    prompts: list[TestPrompt],
+    estimated_calls: int,
+) -> None:
+    """Display the matrix preview in the terminal."""
+    phase_counts: dict[str, int] = {}
+    for e in entries:
+        label = e["phase_label"]
+        phase_counts[label] = phase_counts.get(label, 0) + 1
+
+    console.print(f"\n[bold cyan]═══ Test Matrix Preview ═══[/]\n")
+    for label, count in sorted(phase_counts.items()):
+        console.print(f"  {label}: [yellow]{count}[/] combinations")
+    console.print(f"\n  Prompts           : [yellow]{len(prompts)}[/]")
+    console.print(f"  Total combinations: [yellow]{len(entries)}[/]")
+    console.print(f"  Total runs        : [yellow]{len(prompts) * len(entries)}[/]")
+    console.print(f"  Estimated API calls: [bold yellow]{estimated_calls}[/]")
+
+    table = Table(header_style="bold magenta", show_lines=False, show_edge=True)
+    table.add_column("ID", style="dim", width=8)
+    table.add_column("Phase", max_width=28)
+    table.add_column("Name", max_width=22)
+    table.add_column("Sub-models", max_width=50)
+
+    for e in entries:
+        combo = e["combination"]
+        models_str = ", ".join(
+            f"{sm['role'][:4]}={sm['label'][:12]}" for sm in combo.sub_models
+        )
+        table.add_row(
+            e["combination_id"],
+            e["phase_label"],
+            combo.name,
+            models_str,
+        )
+
+    console.print()
+    console.print(table)
 
 
 # ---------------------------------------------------------------------------
@@ -365,6 +576,8 @@ async def run_single(
     judge_model: dict | None,
     api_key: str,
     run_id: str,
+    combination_id: str = "",
+    phase: str = "",
 ) -> RunResult:
     start = time.monotonic()
 
@@ -403,6 +616,8 @@ async def run_single(
             scores=scores,
             elapsed_seconds=elapsed,
             error=synthesis_error,
+            combination_id=combination_id,
+            phase=phase,
         )
 
     except Exception as exc:
@@ -416,6 +631,8 @@ async def run_single(
             scores=None,
             elapsed_seconds=time.monotonic() - start,
             error=str(exc),
+            combination_id=combination_id,
+            phase=phase,
         )
 
 
@@ -431,20 +648,33 @@ async def run_batch(
     api_key: str,
     concurrency: int,
     progress: Progress,
+    combo_metadata: dict[str, dict] | None = None,
 ) -> list[RunResult]:
+    """
+    Run all prompt × combination pairs.
+
+    combo_metadata: optional mapping from combo.name to
+        {"combination_id": str, "phase": str} for matrix runs.
+    """
     semaphore = asyncio.Semaphore(concurrency)
     ts_tag = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
     total = len(prompts) * len(combinations)
     task_id = progress.add_task("Starting…", total=total)
+    meta = combo_metadata or {}
 
     async def _run_one(p: TestPrompt, combo: Combination) -> RunResult:
         async with semaphore:
             run_id = f"{p.id}__{combo.name}__{ts_tag}"
+            cm = meta.get(combo.name, {})
             progress.update(
                 task_id,
                 description=f"[cyan]{p.id}[/] × [yellow]{combo.name}[/]",
             )
-            result = await run_single(p, combo, judge_model, api_key, run_id)
+            result = await run_single(
+                p, combo, judge_model, api_key, run_id,
+                combination_id=cm.get("combination_id", ""),
+                phase=cm.get("phase", ""),
+            )
             progress.advance(task_id)
             return result
 
@@ -525,7 +755,8 @@ def _compute_summary(results: list[RunResult]) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 CSV_FIELDS = [
-    "run_id", "timestamp", "prompt_id", "prompt_snippet", "category", "combination",
+    "run_id", "combination_id", "phase", "timestamp",
+    "prompt_id", "prompt_snippet", "category", "combination",
     "completeness", "coherence", "diversity_utilized",
     "role_effectiveness", "actionability", "consensus_vs_tension",
     "total_score",
@@ -541,6 +772,8 @@ def _result_to_row(r: RunResult, ts: str) -> dict[str, Any]:
     )
     row: dict[str, Any] = {
         "run_id": r.run_id,
+        "combination_id": r.combination_id,
+        "phase": r.phase,
         "timestamp": ts,
         "prompt_id": r.prompt.id,
         "prompt_snippet": r.prompt.prompt[:100].replace("\n", " "),
@@ -669,17 +902,126 @@ def print_terminal_summary(results: list[RunResult]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Matrix experiment summary — phase-specific findings
+# ---------------------------------------------------------------------------
+
+
+def print_matrix_summary(results: list[RunResult]) -> None:
+    """Print enhanced summary with per-phase findings for matrix experiments."""
+    from collections import defaultdict
+
+    scored = [r for r in results if r.scores and not r.scores.judge_failed and r.scores.total > 0]
+    if not scored:
+        console.print("\n[yellow]No scored results to summarise.[/]")
+        return
+
+    # ── Best combination per category ──
+    cat_scores: dict[str, dict[str, list[int]]] = defaultdict(lambda: defaultdict(list))
+    for r in scored:
+        key = r.combination_id or r.combination.name
+        cat_scores[r.prompt.category][key].append(r.scores.total)
+
+    console.print(f"\n[bold cyan]═══ Matrix Experiment Summary ═══[/]\n")
+    console.print("[bold]Best combination per prompt category:[/]")
+    for cat in sorted(cat_scores):
+        avgs = {k: sum(v) / len(v) for k, v in cat_scores[cat].items()}
+        if not avgs:
+            continue
+        best = max(avgs, key=avgs.__getitem__)
+        cat_color = CATEGORIES.get(cat, {}).get("color", "white")
+        console.print(
+            f"  [{cat_color}]{cat}[/]  →  [yellow]{best}[/]  "
+            f"(avg [bold cyan]{avgs[best]:.1f}[/]/30)"
+        )
+
+    # ── Best combination overall ──
+    all_scores: dict[str, list[int]] = defaultdict(list)
+    for r in scored:
+        key = r.combination_id or r.combination.name
+        all_scores[key].append(r.scores.total)
+    all_avgs = {k: sum(v) / len(v) for k, v in all_scores.items()}
+    if all_avgs:
+        best_overall = max(all_avgs, key=all_avgs.__getitem__)
+        console.print(
+            f"\n[bold]Best combination overall:[/]  "
+            f"[bold yellow]{best_overall}[/]  (avg [bold cyan]{all_avgs[best_overall]:.1f}[/]/30)"
+        )
+        best_r = next((r for r in scored if (r.combination_id or r.combination.name) == best_overall), None)
+        if best_r:
+            for sm in best_r.combination.sub_models:
+                console.print(f"    {sm['role']}: {sm['label']}")
+
+    # ── Phase-specific findings ──
+    phase_results: dict[str, list[RunResult]] = defaultdict(list)
+    for r in scored:
+        if r.phase:
+            phase_results[r.phase].append(r)
+
+    # Phase 1: Role Isolation
+    p1 = phase_results.get("Phase 1: Role Isolation", [])
+    if p1:
+        console.print(f"\n[bold magenta]── Phase 1: Role Isolation ──[/]")
+        avg_role_eff = sum(r.scores.role_effectiveness.score for r in p1) / len(p1)
+        avg_div = sum(r.scores.diversity_utilized.score for r in p1) / len(p1)
+        meaningful = avg_role_eff >= 3.0 and avg_div >= 3.0
+        console.print(f"  Avg role_effectiveness: {avg_role_eff:.1f}/5  |  Avg diversity_utilized: {avg_div:.1f}/5")
+        if meaningful:
+            console.print("  Finding: [green]Yes[/] — roles produced meaningfully different outputs")
+        else:
+            console.print("  Finding: [yellow]Limited[/] — role differentiation was weak with same-model setups")
+        # Best single-model performer
+        p1_avgs: dict[str, list[int]] = defaultdict(list)
+        for r in p1:
+            p1_avgs[r.combination_id or r.combination.name].append(r.scores.total)
+        p1_means = {k: sum(v) / len(v) for k, v in p1_avgs.items()}
+        if p1_means:
+            best_p1 = max(p1_means, key=p1_means.__getitem__)
+            console.print(f"  Best single-model performer: [yellow]{best_p1}[/] (avg {p1_means[best_p1]:.1f}/30)")
+
+    # Phase 2: Model Diversity
+    p2 = phase_results.get("Phase 2: Model Diversity", [])
+    if p2:
+        console.print(f"\n[bold magenta]── Phase 2: Model Diversity ──[/]")
+        # Group by combination to find most consistent (lowest variance)
+        p2_by_combo: dict[str, list[int]] = defaultdict(list)
+        for r in p2:
+            p2_by_combo[r.combination_id or r.combination.name].append(r.scores.total)
+        p2_means = {k: sum(v) / len(v) for k, v in p2_by_combo.items()}
+        # Most consistent = highest average with lowest spread
+        if p2_means:
+            best_p2 = max(p2_means, key=p2_means.__getitem__)
+            console.print(f"  Tested {len(p2_means)} model-diversity combinations")
+            console.print(f"  Most consistent performer: [yellow]{best_p2}[/] (avg {p2_means[best_p2]:.1f}/30)")
+            # Show which role was used in the best combo
+            best_r = next((r for r in p2 if (r.combination_id or r.combination.name) == best_p2), None)
+            if best_r:
+                role_used = best_r.combination.sub_models[0]["role"]
+                console.print(f"  Role assigned: [cyan]{role_used}[/]")
+
+    # Phase 3: Full Combination
+    p3 = phase_results.get("Phase 3: Full Combination", [])
+    if p3:
+        console.print(f"\n[bold magenta]── Phase 3: Full Combination ──[/]")
+        p3_by_combo: dict[str, list[int]] = defaultdict(list)
+        for r in p3:
+            p3_by_combo[r.combination_id or r.combination.name].append(r.scores.total)
+        p3_means = {k: sum(v) / len(v) for k, v in p3_by_combo.items()}
+        if p3_means:
+            best_p3 = max(p3_means, key=p3_means.__getitem__)
+            console.print(f"  Winning full combination: [bold yellow]{best_p3}[/] (avg {p3_means[best_p3]:.1f}/30)")
+            best_r = next((r for r in p3 if (r.combination_id or r.combination.name) == best_p3), None)
+            if best_r:
+                for sm in best_r.combination.sub_models:
+                    console.print(f"    {sm['role']}: {sm['label']}")
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Batch evaluation harness for SynthesizAIr.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__,
-    )
-    parser.add_argument("json_file", help="Path to JSON test-prompts file")
+def _add_common_args(parser: argparse.ArgumentParser) -> None:
+    """Add flags shared by both 'run' and 'generate' subcommands."""
     parser.add_argument(
         "-o", "--output",
         help="Output CSV path (default: batch_results_TIMESTAMP.csv)",
@@ -699,8 +1041,52 @@ def main() -> None:
         action="store_true",
         help="Skip judge scoring — only synthesis metrics recorded",
     )
-    args = parser.parse_args()
 
+
+def _resolve_judge(args: argparse.Namespace, default_judge: dict) -> dict | None:
+    if args.no_judge:
+        return None
+    if args.judge:
+        return {"id": args.judge, "label": args.judge}
+    return default_judge
+
+
+def _run_and_report(
+    prompts: list[TestPrompt],
+    combinations: list[Combination],
+    judge_model: dict | None,
+    api_key: str,
+    concurrency: int,
+    output_path: str,
+    combo_metadata: dict[str, dict] | None = None,
+    is_matrix: bool = False,
+) -> None:
+    """Shared execution: run batch, print summary, write CSV."""
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        TimeElapsedColumn(),
+        console=console,
+        transient=False,
+    ) as progress:
+        results = asyncio.run(
+            run_batch(
+                prompts, combinations, judge_model,
+                api_key, concurrency, progress,
+                combo_metadata=combo_metadata,
+            )
+        )
+
+    print_terminal_summary(results)
+    if is_matrix:
+        print_matrix_summary(results)
+    write_csv(results, output_path)
+
+
+def cmd_run(args: argparse.Namespace) -> None:
+    """Handler for the 'run' subcommand (original batch tester behaviour)."""
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         console.print("[bold red]Error:[/] OPENROUTER_API_KEY not set.")
@@ -715,11 +1101,7 @@ def main() -> None:
         console.print(f"[bold red]Invalid test file:[/] {exc}")
         sys.exit(1)
 
-    if args.judge:
-        judge_model = {"id": args.judge, "label": args.judge}
-    if args.no_judge:
-        judge_model = None
-
+    judge_model = _resolve_judge(args, judge_model)
     ts = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
     output_path = args.output or f"batch_results_{ts}.csv"
 
@@ -737,24 +1119,211 @@ def main() -> None:
     console.print(f"  Concurrency  : {args.concurrency}")
     console.print(f"  Output       : {output_path}\n")
 
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        TimeElapsedColumn(),
-        console=console,
-        transient=False,
-    ) as progress:
-        results = asyncio.run(
-            run_batch(
-                prompts, combinations, judge_model,
-                api_key, args.concurrency, progress,
-            )
-        )
+    _run_and_report(prompts, combinations, judge_model, api_key, args.concurrency, output_path)
 
-    print_terminal_summary(results)
-    write_csv(results, output_path)
+
+def cmd_generate(args: argparse.Namespace) -> None:
+    """Handler for the 'generate' subcommand (matrix experiment mode)."""
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        console.print("[bold red]Error:[/] OPENROUTER_API_KEY not set.")
+        sys.exit(1)
+
+    # Load prompts from JSON (only the prompts array is needed)
+    try:
+        prompts, _, default_judge = load_test_file(args.json_file)
+    except FileNotFoundError:
+        console.print(f"[bold red]File not found:[/] {args.json_file}")
+        sys.exit(1)
+    except (json.JSONDecodeError, KeyError) as exc:
+        console.print(f"[bold red]Invalid test file:[/] {exc}")
+        sys.exit(1)
+
+    # Filter by categories if specified
+    if args.categories:
+        prompts = [p for p in prompts if p.category in args.categories]
+        if not prompts:
+            console.print("[bold red]No prompts match the specified categories.[/]")
+            sys.exit(1)
+
+    # Build model pool
+    if args.model_pool:
+        model_pool = [{"id": mid, "label": mid.split("/")[-1]} for mid in args.model_pool]
+    else:
+        model_pool = [
+            {"id": m["id"], "label": m["label"]}
+            for m in DEFAULT_SUB_MODELS
+        ]
+
+    # Resolve master model
+    if args.master:
+        master_model = {"id": args.master, "label": args.master.split("/")[-1]}
+    else:
+        master_model = dict(DEFAULT_MASTER_MODEL)
+
+    # Parse phases
+    phases = [int(p) for p in args.phases.split(",")] if args.phases else [1, 2, 3]
+
+    # Resolve roles
+    role_pool = list(ROLE_NAMES)
+
+    console.print(f"\n[bold cyan]SynthesizAIr Matrix Generator[/]")
+    console.print(f"  Model pool   : {len(model_pool)} models")
+    for m in model_pool:
+        console.print(f"    {m['label']} ({m['id']})")
+    console.print(f"  Master       : {master_model['label']}")
+    console.print(f"  Phases       : {phases}")
+    console.print(f"  Max per phase: {args.max_combinations}")
+
+    # Generate combinations
+    entries = generate_combinations(
+        model_pool=model_pool,
+        role_pool=role_pool,
+        phases=phases,
+        max_combinations=args.max_combinations,
+        master_model=master_model,
+    )
+
+    if not entries:
+        console.print("[bold red]No combinations generated. Check model pool size and phases.[/]")
+        sys.exit(1)
+
+    # Write preview
+    preview_path = args.preview or "test_matrix.json"
+    estimated_calls = write_matrix_preview(
+        entries, prompts, model_pool, master_model,
+        args.categories, output_path=preview_path,
+    )
+    print_matrix_preview(entries, prompts, estimated_calls)
+    console.print(f"\n  Preview written to: [green]{preview_path}[/]")
+
+    # Confirmation gate
+    if args.dry_run:
+        console.print("\n[dim]--dry-run: stopping before execution.[/]")
+        return
+
+    try:
+        from rich.prompt import Prompt
+        confirm = Prompt.ask(
+            f"\nProceed with [bold]{len(prompts) * len(entries)}[/] runs "
+            f"(~[bold]{estimated_calls}[/] API calls)?",
+            choices=["y", "n"],
+            default="y",
+        )
+        if confirm != "y":
+            console.print("[dim]Cancelled.[/]")
+            return
+    except (KeyboardInterrupt, EOFError):
+        console.print("\n[dim]Cancelled.[/]")
+        return
+
+    # Prepare combinations and metadata for the batch runner
+    combinations = [e["combination"] for e in entries]
+    combo_metadata = {
+        e["combination"].name: {
+            "combination_id": e["combination_id"],
+            "phase": e["phase_label"],
+        }
+        for e in entries
+    }
+
+    judge_model = _resolve_judge(args, default_judge)
+    ts = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
+    output_path = args.output or f"matrix_results_{ts}.csv"
+
+    console.print(
+        f"\n  Judge model  : "
+        + (f"[green]{judge_model['label']}[/]" if judge_model else "[dim]disabled[/]")
+    )
+    console.print(f"  Concurrency  : {args.concurrency}")
+    console.print(f"  Output       : {output_path}\n")
+
+    _run_and_report(
+        prompts, combinations, judge_model, api_key,
+        args.concurrency, output_path,
+        combo_metadata=combo_metadata,
+        is_matrix=True,
+    )
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Batch evaluation harness for SynthesizAIr.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    subparsers = parser.add_subparsers(dest="command")
+
+    # ── run: original batch tester ──
+    run_parser = subparsers.add_parser(
+        "run",
+        help="Run batch tests from a JSON file (original mode)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+    )
+    run_parser.add_argument("json_file", help="Path to JSON test-prompts file")
+    _add_common_args(run_parser)
+
+    # ── generate: matrix experiment mode ──
+    gen_parser = subparsers.add_parser(
+        "generate",
+        help="Generate & run a test matrix across model/role combinations",
+    )
+    gen_parser.add_argument("json_file", help="Path to JSON prompts file")
+    gen_parser.add_argument(
+        "--model-pool",
+        nargs="+",
+        metavar="MODEL_ID",
+        help="Model IDs for the pool (default: the 5 default sub-models)",
+    )
+    gen_parser.add_argument(
+        "--master",
+        metavar="MODEL_ID",
+        help="Master model ID (default: built-in master)",
+    )
+    gen_parser.add_argument(
+        "--phases",
+        default="1,2,3",
+        help="Comma-separated phase numbers to run (default: 1,2,3)",
+    )
+    gen_parser.add_argument(
+        "--max-combinations",
+        type=int,
+        default=10,
+        help="Max combinations per phase — budget cap (default: 10)",
+    )
+    gen_parser.add_argument(
+        "--categories",
+        nargs="+",
+        metavar="CAT",
+        help=f"Filter prompts to these categories (default: all). Choices: {CATEGORY_NAMES}",
+    )
+    gen_parser.add_argument(
+        "--preview",
+        metavar="PATH",
+        help="Path for the preview JSON (default: test_matrix.json)",
+    )
+    gen_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Generate and preview the matrix but do not execute runs",
+    )
+    _add_common_args(gen_parser)
+
+    # Backward compatibility: if first arg is not a known subcommand,
+    # treat the entire argv as the 'run' subcommand.
+    known_commands = {"run", "generate", "-h", "--help"}
+    if len(sys.argv) > 1 and sys.argv[1] not in known_commands:
+        sys.argv.insert(1, "run")
+
+    args = parser.parse_args()
+
+    if args.command == "run":
+        cmd_run(args)
+    elif args.command == "generate":
+        cmd_generate(args)
+    else:
+        parser.print_help()
+        sys.exit(1)
 
 
 if __name__ == "__main__":
