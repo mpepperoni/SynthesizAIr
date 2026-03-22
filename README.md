@@ -69,15 +69,40 @@ Selecting a category adjusts how the master model weights each role during synth
 
 ## Early Findings
 
-Two test runs conducted against free-tier OpenRouter models. These are real outputs, not cherry-picked demos.
+Three test runs across both free-tier and paid OpenRouter models. These are real outputs, not cherry-picked demos.
 
-### Run 1 — Authentic Chinese Noodle Recipe (Creative/Brainstorming)
+### Model Panels Tested
+
+**Free Panel** — all `:free` tier OpenRouter models
+| Role | Model |
+|---|---|
+| Analytical | Nemotron Nano 30B |
+| Devil's Advocate | Step 3.5 Flash |
+| Creative | MiniMax M2.5 |
+| Pragmatist | LFM 1.2B Instruct |
+| Synthesizer | Trinity Large |
+| Master | Nemotron Super 120B |
+
+**Paid Panel** — frontier models via OpenRouter
+| Role | Model |
+|---|---|
+| Devil's Advocate | Gemini 2.5 Pro |
+| Creative | GPT-4.1 |
+| Pragmatist | Llama 4 Maverick |
+| Synthesizer | DeepSeek R1 |
+| Master | Claude Sonnet 4 |
+
+---
+
+### Run 1 — Authentic Chinese Noodle Recipe (Creative/Brainstorming) — Free Panel
 
 Five models diverged immediately on dish choice — Analytical went Lanzhou beef noodle soup, Creative went Dan Dan noodles, Pragmatist focused on accessible substitutions. The master synthesized a hybrid: Lanzhou broth architecture with a Dan Dan sesame-chili sauce layer. It attributed each element to the sub-model that contributed it. The result was a coherent, cookable recipe that no single model produced independently.
 
 **Key observation:** Role diversity mattered more than model diversity here. The Creative role's willingness to pick a completely different dish gave the master real material to work with.
 
-### Run 2 — Career Transition: Technical Trade → Network Engineering (Strategy/Planning)
+---
+
+### Run 2 — Career Transition: Technical Trade → Network Engineering (Strategy/Planning) — Free Panel
 
 The Devil's Advocate role produced the most valuable output in this run. While other models gave structured, encouraging advice about certifications and skill gaps, the Devil's Advocate pushed back hard on the certification-first mindset — arguing that a CCNA without hands-on depth is just paper, and that real transition means building systems thinking, not collecting credentials.
 
@@ -92,7 +117,19 @@ Medium impact →  Research/Synthesis
 Lower impact  →  Creative/Brainstorming
 ```
 
-This is what the batch tester is designed to systematically verify.
+---
+
+### Run 3 — Teaching Math to 5-6 Year Olds (Creative/Brainstorming) — Paid Panel
+
+The quality jump from free to paid panel was immediately noticeable. Three genuine pedagogical tensions surfaced in disagreement detection — structure vs. exploration, concrete vs. abstract progression, and disciplinary vs. interdisciplinary framing. These aren't model artifacts; they're real debates in early childhood education that the system identified unprompted.
+
+The master synthesis produced concepts that no single sub-model generated — a "Math Detective" framework resolving the structure/exploration tension, and "Mathematical Empathy" (numbers have friendships, shapes have families) as a novel framing for abstract concepts. The closing meta-insight — *"children don't learn math, they discover it was there all along"* — emerged purely from synthesis, not from any individual output.
+
+**Cost:** $0.0714 for the full paid panel run — six model calls including master synthesis and disagreement detection.
+
+**Key observation:** The paid panel produced richer disagreement and more original synthesis. The free panel is solid for development and testing architecture. The paid panel is where the output quality justifies the use case.
+
+**Cross-run finding:** The best synthesis outputs occur when sub-models disagree on fundamentals, not just details. Run 1 disagreed on dish choice. Run 2 disagreed on what certifications actually mean. Run 3 disagreed on the philosophy of how children learn. Substantive disagreement between roles is the feature, not a bug.
 
 ---
 
@@ -183,8 +220,9 @@ After all runs, summary reports best combination per category, per phase finding
 
 ## Default Models
 
-All defaults use free-tier OpenRouter models:
+Two built-in panels selectable at startup. All models swappable at runtime via CLI, API, or batch config.
 
+**Free Panel** (default) — no API credits required
 | Role | Model |
 |---|---|
 | Analytical | Nemotron Nano 30B |
@@ -194,7 +232,14 @@ All defaults use free-tier OpenRouter models:
 | Synthesizer | Trinity Large |
 | **Master** | **Nemotron Super 120B** |
 
-All models swappable at runtime via CLI, API, or batch config.
+**Paid Panel** — frontier models, higher output quality (~$0.07/run)
+| Role | Model |
+|---|---|
+| Devil's Advocate | Gemini 2.5 Pro |
+| Creative | GPT-4.1 |
+| Pragmatist | Llama 4 Maverick |
+| Synthesizer | DeepSeek R1 |
+| **Master** | **Claude Sonnet 4** |
 
 ---
 
