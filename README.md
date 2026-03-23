@@ -145,16 +145,31 @@ Options:
 
 ## Default Models
 
+### Free Panel
+
 All defaults use free-tier OpenRouter models:
+
+| Role | Model | Why |
+|------|-------|-----|
+| Analytical | Nemotron Super 49B | 262K context, hybrid architecture, near o4-mini reasoning performance |
+| Devil's Advocate | GPT-OSS 20B | OpenAI open-weight, strong instruction following for adversarial prompts |
+| Creative | Trinity Large | Purpose-built for creative writing and storytelling, 512K context |
+| Pragmatist | Llama 3.3 70B | Reliable GPT-4 level workhorse, consistent structured output |
+| Synthesizer | Mistral Small 3.1 24B | Strong text reasoning, 128K context, good at connecting threads |
+| **Master** | **Nemotron Super 49B** | Same as Analytical — doubles as master for cost-free synthesis |
+
+> **Rate limits:** The OpenRouter free tier allows 20 req/min and 200 req/day. When batch testing, use the `--delay` flag between phases to avoid quota errors (e.g. `--delay 5`).
+
+### Paid Panel
 
 | Role | Model |
 |------|-------|
-| Analytical | Nemotron Nano 30B |
-| Devil's Advocate | Step 3.5 Flash |
-| Creative | MiniMax M2.5 |
-| Pragmatist | LFM 1.2B Instruct |
-| Synthesizer | Trinity Large |
-| **Master** | **Nemotron Super 120B** |
+| Analytical | Claude Sonnet 4.6 |
+| Devil's Advocate | Gemini 2.5 Pro |
+| Creative | GPT-5.2 |
+| Pragmatist | Llama 4 Maverick |
+| Synthesizer | DeepSeek R1 |
+| **Master** | **Claude Sonnet 4.6** |
 
 Models can be customized at runtime through the CLI, API request body, or batch test JSON.
 
