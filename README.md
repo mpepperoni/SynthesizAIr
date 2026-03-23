@@ -173,6 +173,49 @@ All defaults use free-tier OpenRouter models:
 
 Models can be customized at runtime through the CLI, API request body, or batch test JSON.
 
+## Tested Configurations
+
+Batch testing across all four prompt categories revealed that **role assignment matters more than raw model quality**. The baseline default lineup scored weakest overall — purpose-built presets with deliberate role/model pairings consistently outperformed it.
+
+Two named presets are available in `config.py` and are automatically suggested when you select a category in the CLI:
+
+### Preset: Grok-Anchored
+
+Best for **Strategy/Planning** and **Research/Synthesis**.
+
+| Role | Model |
+|------|-------|
+| Analytical | Gemini 3.1 Pro |
+| Devil's Advocate | Grok 4 20B |
+| Creative | GPT-5.4 |
+| Pragmatist | Gemini 3.1 Pro |
+| Synthesizer | MiniMax M2.7 |
+| **Master** | **Claude Sonnet 4.6** |
+
+### Preset: Intuition
+
+Best for **Analysis/Evaluation** and **Creative/Brainstorming**. Mirrors the paid-panel default (Lineup A).
+
+| Role | Model |
+|------|-------|
+| Analytical | Claude Sonnet 4.6 |
+| Devil's Advocate | Gemini 2.5 Pro |
+| Creative | GPT-5.2 |
+| Pragmatist | Llama 4 Maverick |
+| Synthesizer | DeepSeek R1 |
+| **Master** | **Claude Sonnet 4.6** |
+
+### Scoring Summary
+
+| Category | Grok-Anchored | Intuition | Baseline Default |
+|----------|:------------:|:---------:|:----------------:|
+| Strategy/Planning | **24/30** | 20/30 | 17/30 |
+| Research/Synthesis | **23/30** | 19/30 | 16/30 |
+| Analysis/Evaluation | 19/30 | **22/30** | 18/30 |
+| Creative/Brainstorming | 18/30 | **21/30** | 15/30 |
+
+> **Truncation fix:** Synthesis output is now capped at 1500 words via an explicit instruction in the master prompt, alongside the increased `MAX_TOKENS_MASTER` ceiling of 8192. This resolved the mid-sentence truncation failures flagged by the judge in earlier runs.
+
 ## Configuration Reference
 
 Key settings in `config.py`:

@@ -66,7 +66,9 @@ from config import (
     DEFAULT_SUB_MODELS,
     DISAGREEMENT_ABSENT_MARKER,
     MAX_TOKENS_DISAGREEMENT,
-    MAX_TOKENS_MASTER,
+    MAX_TOKENS_MASTER,  # Token ceiling only — synthesis prompts can exceed 16k chars on
+    # complex prompts. The 1500-word instruction in the master prompt (config.py) is the
+    # primary length control.
     MAX_TOKENS_SUB,
     OPENROUTER_CHAT_ENDPOINT,
     REQUEST_TIMEOUT_SECONDS,
