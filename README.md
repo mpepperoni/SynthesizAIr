@@ -69,32 +69,11 @@ Selecting a category adjusts how the master model weights each role during synth
 
 ## Early Findings
 
-Three test runs across both free-tier and paid OpenRouter models. These are real outputs, not cherry-picked demos.
+Real outputs from manual test runs and systematic batch testing. Not cherry-picked demos.
 
-### Model Panels Tested
+### Manual Test Runs
 
-**Free Panel** — all `:free` tier OpenRouter models
-| Role | Model |
-|---|---|
-| Analytical | Nemotron Nano 30B |
-| Devil's Advocate | Step 3.5 Flash |
-| Creative | MiniMax M2.5 |
-| Pragmatist | LFM 1.2B Instruct |
-| Synthesizer | Trinity Large |
-| Master | Nemotron Super 120B |
-
-**Paid Panel** — frontier models via OpenRouter
-| Role | Model |
-|---|---|
-| Devil's Advocate | Gemini 2.5 Pro |
-| Creative | GPT-4.1 |
-| Pragmatist | Llama 4 Maverick |
-| Synthesizer | DeepSeek R1 |
-| Master | Claude Sonnet 4 |
-
----
-
-### Run 1 — Authentic Chinese Noodle Recipe (Creative/Brainstorming) — Free Panel
+**Run 1 — Authentic Chinese Noodle Recipe (Creative/Brainstorming) — Free Panel**
 
 Five models diverged immediately on dish choice — Analytical went Lanzhou beef noodle soup, Creative went Dan Dan noodles, Pragmatist focused on accessible substitutions. The master synthesized a hybrid: Lanzhou broth architecture with a Dan Dan sesame-chili sauce layer. It attributed each element to the sub-model that contributed it. The result was a coherent, cookable recipe that no single model produced independently.
 
@@ -102,7 +81,7 @@ Five models diverged immediately on dish choice — Analytical went Lanzhou beef
 
 ---
 
-### Run 2 — Career Transition: Technical Trade → Network Engineering (Strategy/Planning) — Free Panel
+**Run 2 — Career Transition: Technical Trade to Network Engineering (Strategy/Planning) — Free Panel**
 
 The Devil's Advocate role produced the most valuable output in this run. While other models gave structured, encouraging advice about certifications and skill gaps, the Devil's Advocate pushed back hard on the certification-first mindset — arguing that a CCNA without hands-on depth is just paper, and that real transition means building systems thinking, not collecting credentials.
 
@@ -110,16 +89,9 @@ The master synthesis incorporated this tension explicitly, pairing each recommen
 
 **Key observation:** The Devil's Advocate role's effectiveness scales with prompt stakes. Career decisions have real consequences. The role produced more valuable output here than it did on the recipe prompt, where "authenticity" is philosophical rather than consequential.
 
-**Early hypothesis for batch testing:** Devil's Advocate role impact likely correlates with category:
-```
-High impact   →  Strategy/Planning, Analysis/Evaluation
-Medium impact →  Research/Synthesis
-Lower impact  →  Creative/Brainstorming
-```
-
 ---
 
-### Run 3 — Teaching Math to 5-6 Year Olds (Creative/Brainstorming) — Paid Panel
+**Run 3 — Teaching Math to 5-6 Year Olds (Creative/Brainstorming) — Paid Panel**
 
 The quality jump from free to paid panel was immediately noticeable. Three genuine pedagogical tensions surfaced in disagreement detection — structure vs. exploration, concrete vs. abstract progression, and disciplinary vs. interdisciplinary framing. These aren't model artifacts; they're real debates in early childhood education that the system identified unprompted.
 
@@ -127,9 +99,24 @@ The master synthesis produced concepts that no single sub-model generated — a 
 
 **Cost:** $0.0714 for the full paid panel run — six model calls including master synthesis and disagreement detection.
 
-**Key observation:** The paid panel produced richer disagreement and more original synthesis. The free panel is solid for development and testing architecture. The paid panel is where the output quality justifies the use case.
+---
 
-**Cross-run finding:** The best synthesis outputs occur when sub-models disagree on fundamentals, not just details. Run 1 disagreed on dish choice. Run 2 disagreed on what certifications actually mean. Run 3 disagreed on the philosophy of how children learn. Substantive disagreement between roles is the feature, not a bug.
+### Batch Test Findings
+
+Systematic testing across four prompt categories and four lineup configurations produced the following conclusions:
+
+**Role assignment matters more than raw model quality.** The baseline default lineup (strong models, unoptimized role assignment) scored weakest in every category. Purpose-built presets with deliberate role/model pairings consistently outperformed it.
+
+**The Grok Devil's Advocate hypothesis held — but only for half the categories.** Grok-Anchored dominated Strategy and Research with the highest consensus_vs_tension scores in the dataset (5/5 on Strategy). But on Creative and Analysis tasks, the Intuition preset won — Grok's adversarial strength actually hurt on creative prompts, scoring 13/30 vs 22/30.
+
+**Substantive disagreement between roles is the feature, not a bug.** The best synthesis outputs occurred when sub-models disagreed on fundamentals, not just details.
+
+**Devil's Advocate role impact correlates with category:**
+```
+High impact   →  Strategy/Planning, Analysis/Evaluation
+Medium impact →  Research/Synthesis
+Lower impact  →  Creative/Brainstorming
+```
 
 ---
 
@@ -159,8 +146,14 @@ python synthesizer.py
 Starts a terminal UI. Select a category, enter your question, watch all six models respond in real time, then get the synthesized answer.
 
 Two modes available at startup:
-- **Auto** — Uses default model/role assignments
-- **Custom** — Fetches full free model list from OpenRouter, assign any model to any role
+- **Auto** — Uses default model/role assignments with category-based preset suggestion
+- **Custom** — Fetches full model list from OpenRouter, assign any model to any role
+
+When you select a category, the CLI suggests the optimal preset based on batch test results:
+```
+Category selected: Strategy/Planning
+→ Based on testing, Grok-Anchored preset performs best for this category. Use it? (y/n)
+```
 
 ### REST API
 
@@ -194,6 +187,8 @@ python batch_tester.py run test_prompts.json --no-judge
 
 Runs synthesis across multiple prompts, optionally scoring with a judge model. Outputs CSV with detailed metrics per run.
 
+> **Free tier note:** Free models on OpenRouter have a limit of 20 requests/minute and 200 requests/day. Use `--delay` between phases to avoid quota errors mid-run. Free models are suitable for architecture testing; use the paid panel for reliable batch evaluation.
+
 ### Matrix Experiments
 
 ```bash
@@ -208,13 +203,11 @@ Runs three experiment phases:
 
 | Phase | Name | Tests |
 |---|---|---|
-| 1 | Role Isolation | Same model × 5, all different roles — does the role system actually work? |
+| 1 | Role Isolation | Same model x 5, all different roles — does the role system actually work? |
 | 2 | Model Diversity | Different models, same role — does model choice matter independently? |
 | 3 | Full Combination | Different models + different roles — what's the winning config? |
 
 Generates a `test_matrix.json` preview showing every combination and estimated API call count before executing. Budget cap via `--max-combinations` prevents runaway costs.
-
-After all runs, summary reports best combination per category, per phase findings, and overall winner.
 
 ---
 
@@ -223,23 +216,77 @@ After all runs, summary reports best combination per category, per phase finding
 Two built-in panels selectable at startup. All models swappable at runtime via CLI, API, or batch config.
 
 **Free Panel** (default) — no API credits required
-| Role | Model |
-|---|---|
-| Analytical | Nemotron Nano 30B |
-| Devil's Advocate | Step 3.5 Flash |
-| Creative | MiniMax M2.5 |
-| Pragmatist | LFM 1.2B Instruct |
-| Synthesizer | Trinity Large |
-| **Master** | **Nemotron Super 120B** |
+
+| Role | Model | Why |
+|---|---|---|
+| Analytical | Nemotron Super 49B | 262K context, near o4-mini reasoning performance |
+| Devil's Advocate | GPT-OSS 20B | OpenAI open-weight, strong instruction following for adversarial prompts |
+| Creative | Trinity Large Preview | Purpose-built for creative writing and storytelling, 512K context |
+| Pragmatist | Llama 3.3 70B | Reliable GPT-4 level workhorse, consistent structured output |
+| Synthesizer | Mistral Small 3.1 24B | Strong text reasoning, 128K context, good at connecting threads |
+| **Master** | **Nemotron Super 49B** | Reliable enough for synthesis at zero cost |
+
+> **Note:** LFM 1.2B was removed after batch testing confirmed it as unreliable (diversity_utilized: 1/5, role_effectiveness: 1/5, all sub-model outputs failed). Sub-10B models struggle with structured role-following in this pipeline.
 
 **Paid Panel** — frontier models, higher output quality (~$0.07/run)
+
 | Role | Model |
 |---|---|
+| Analytical | Claude Sonnet 4.6 |
 | Devil's Advocate | Gemini 2.5 Pro |
-| Creative | GPT-4.1 |
+| Creative | GPT-5.4 |
 | Pragmatist | Llama 4 Maverick |
 | Synthesizer | DeepSeek R1 |
-| **Master** | **Claude Sonnet 4** |
+| **Master** | **Claude Sonnet 4.6** |
+
+---
+
+## Tested Configurations
+
+Batch testing across all four prompt categories revealed that **role assignment matters more than raw model quality**. Two named presets are available in `config.py` and automatically suggested when you select a category in the CLI.
+
+### Preset: Grok-Anchored
+
+Best for **Strategy/Planning** and **Research/Synthesis**.
+
+Grok in the Devil's Advocate role produces the highest consensus_vs_tension scores in the dataset. Its adversarial strength and strict prompt adherence surfaces genuine disagreement rather than performative contrarianism — exactly what strategy and research questions need.
+
+| Role | Model |
+|---|---|
+| Analytical | Gemini 3.1 Pro |
+| Devil's Advocate | Grok 4 20B |
+| Creative | GPT-5.4 |
+| Pragmatist | Gemini 3.1 Pro |
+| Synthesizer | MiniMax M2.7 |
+| **Master** | **Claude Sonnet 4.6** |
+
+### Preset: Intuition
+
+Best for **Analysis/Evaluation** and **Creative/Brainstorming**.
+
+Grok's adversarial strength hurts on creative prompts — introducing friction where divergent thinking is more valuable. This preset prioritizes model diversity with role assignments matched to natural strengths.
+
+| Role | Model |
+|---|---|
+| Analytical | Claude Sonnet 4.6 |
+| Devil's Advocate | Gemini 2.5 Pro |
+| Creative | GPT-5.4 |
+| Pragmatist | Llama 4 Maverick |
+| Synthesizer | DeepSeek R1 |
+| **Master** | **Claude Sonnet 4.6** |
+
+### Scoring Summary
+
+Scores out of 30, based on batch testing across four prompt categories.
+
+| Category | Grok-Anchored | Intuition | Baseline Default |
+|---|---|---|---|
+| Strategy/Planning | **24/30** | 19/30 | 16/30 |
+| Research/Synthesis | **23/30** | 20/30 | 17/30 |
+| Analysis/Evaluation | 20/30 | **23/30** | 20/30 |
+| Creative/Brainstorming | 13/30 | **22/30** | 16/30 |
+
+> **Truncation note:** Synthesis output is capped at 1500 words via an explicit instruction in the master prompt, alongside a `MAX_TOKENS_MASTER` ceiling of 8192. Complex prompts can generate 10,000–16,000 character responses — the word limit is the primary control, not the token ceiling.
 
 ---
 
@@ -260,49 +307,6 @@ The architecture is intentionally layered — `orchestrator.py` contains all bus
 
 ---
 
-## Tested Configurations
-
-Batch testing across all four prompt categories revealed that **role assignment matters more than raw model quality**. The baseline default lineup scored weakest overall — purpose-built presets with deliberate role/model pairings consistently outperformed it.
-
-Two named presets are available in `config.py` and are automatically suggested when you select a category in the CLI:
-
-### Preset: Grok-Anchored
-
-Best for **Strategy/Planning** and **Research/Synthesis**.
-
-| Role | Model |
-|------|-------|
-| Analytical | Gemini 3.1 Pro |
-| Devil's Advocate | Grok 4 20B |
-| Creative | GPT-5.4 |
-| Pragmatist | Gemini 3.1 Pro |
-| Synthesizer | MiniMax M2.7 |
-| **Master** | **Claude Sonnet 4.6** |
-
-### Preset: Intuition
-
-Best for **Analysis/Evaluation** and **Creative/Brainstorming**. Mirrors the paid-panel default (Lineup A).
-
-| Role | Model |
-|------|-------|
-| Analytical | Claude Sonnet 4.6 |
-| Devil's Advocate | Gemini 2.5 Pro |
-| Creative | GPT-5.2 |
-| Pragmatist | Llama 4 Maverick |
-| Synthesizer | DeepSeek R1 |
-| **Master** | **Claude Sonnet 4.6** |
-
-### Scoring Summary
-
-| Category | Grok-Anchored | Intuition | Baseline Default |
-|----------|:------------:|:---------:|:----------------:|
-| Strategy/Planning | **24/30** | 20/30 | 17/30 |
-| Research/Synthesis | **23/30** | 19/30 | 16/30 |
-| Analysis/Evaluation | 19/30 | **22/30** | 18/30 |
-| Creative/Brainstorming | 18/30 | **21/30** | 15/30 |
-
-> **Truncation fix:** Synthesis output is now capped at 1500 words via an explicit instruction in the master prompt, alongside the increased `MAX_TOKENS_MASTER` ceiling of 8192. This resolved the mid-sentence truncation failures flagged by the judge in earlier runs.
-
 ## Configuration Reference
 
 Key settings in `config.py`:
@@ -311,7 +315,7 @@ Key settings in `config.py`:
 |---|---|---|
 | `REQUEST_TIMEOUT_SECONDS` | 60 | Timeout per API call |
 | `MAX_TOKENS_SUB` | 1024 | Max tokens for sub-model responses |
-| `MAX_TOKENS_MASTER` | 8192 | Max tokens for master synthesis |
+| `MAX_TOKENS_MASTER` | 8192 | Max tokens for master synthesis (word limit in prompt is primary control) |
 | `MAX_TOKENS_DISAGREEMENT` | 600 | Max tokens for disagreement detection |
 | `TEMPERATURE_SUB` | 0.7 | Creativity for sub-models |
 | `TEMPERATURE_MASTER` | 0.3 | Precision for master model |
