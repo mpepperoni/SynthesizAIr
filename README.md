@@ -219,12 +219,12 @@ Two built-in panels selectable at startup. All models swappable at runtime via C
 
 | Role | Model | Why |
 |---|---|---|
-| Analytical | Nemotron Super 49B | 262K context, near o4-mini reasoning performance |
-| Devil's Advocate | GPT-OSS 20B | OpenAI open-weight, strong instruction following for adversarial prompts |
-| Creative | Trinity Large Preview | Purpose-built for creative writing and storytelling, 512K context |
-| Pragmatist | Llama 3.3 70B | Reliable GPT-4 level workhorse, consistent structured output |
-| Synthesizer | Mistral Small 3.1 24B | Strong text reasoning, 128K context, good at connecting threads |
-| **Master** | **Nemotron Super 49B** | Reliable enough for synthesis at zero cost |
+| Analytical | Nemotron 3 Super 120B | 262K context, 120B hybrid MoE, strong structured reasoning |
+| Devil's Advocate | Step 3.5 Flash | 256K context, MoE architecture, strong adversarial reasoning |
+| Creative | Trinity Large Preview | 400B sparse MoE, purpose-built for creative writing, 131K context |
+| Pragmatist | MiniMax M2.5 | 196K context, productivity-focused, consistent structured output |
+| Synthesizer | Nemotron 3 Nano 30B | 256K context, efficient MoE, good at connecting threads |
+| **Master** | **Nemotron 3 Super 120B** | Same as Analytical — doubles as master for cost-free synthesis |
 
 > **Note:** LFM 1.2B was removed after batch testing confirmed it as unreliable (diversity_utilized: 1/5, role_effectiveness: 1/5, all sub-model outputs failed). Sub-10B models struggle with structured role-following in this pipeline.
 
@@ -253,10 +253,10 @@ Grok in the Devil's Advocate role produces the highest consensus_vs_tension scor
 
 | Role | Model |
 |---|---|
-| Analytical | Gemini 3.1 Pro |
-| Devil's Advocate | Grok 4 20B |
+| Analytical | Gemini 3.1 Pro Preview |
+| Devil's Advocate | Grok 4.20 |
 | Creative | GPT-5.4 |
-| Pragmatist | Gemini 3.1 Pro |
+| Pragmatist | Gemini 3.1 Pro Preview |
 | Synthesizer | MiniMax M2.7 |
 | **Master** | **Claude Sonnet 4.6** |
 
