@@ -1,6 +1,8 @@
+import argparse
 import asyncio
 import os
 import sys
+from datetime import datetime, timezone
 
 import httpx
 from dotenv import load_dotenv
@@ -346,12 +348,82 @@ def make_status_table(
     return table
 
 
+def export_markdown(
+    prompt: str,
+    outcome: dict,
+    category: str | None = None,
+    save_dir: str = ".",
+) -> str:
+    """Write synthesis results to a timestamped markdown file. Returns the file path."""
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    slug = "".join(c if c.isalnum() else "_" for c in prompt[:40]).strip("_")
+    filename = f"synthesis_{slug}_{ts}.md"
+    filepath = os.path.join(save_dir, filename)
+
+    lines: list[str] = []
+    lines.append(f"# SynthesizAIr — Synthesis Result\n")
+    lines.append(f"**Date:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}\n")
+    if category:
+        lines.append(f"**Category:** {category}\n")
+    lines.append(f"**Prompt:** {prompt}\n")
+
+    # Sub-model responses
+    lines.append("---\n")
+    lines.append("## Individual Responses\n")
+    for r in outcome["sub_results"]:
+        role_tag = f" ({r.role})" if r.role else ""
+        lines.append(f"### {r.label}{role_tag}  —  {r.elapsed_seconds:.1f}s\n")
+        if r.content:
+            lines.append(f"{r.content.strip()}\n")
+        else:
+            lines.append(f"**Failed:** {r.error}\n")
+
+    # Master independent view
+    mr = outcome["master_initial"]
+    lines.append("---\n")
+    lines.append(f"## Master Independent View — {mr.label}  ({mr.elapsed_seconds:.1f}s)\n")
+    if mr.content:
+        lines.append(f"{mr.content.strip()}\n")
+    else:
+        lines.append(f"**Failed:** {mr.error}\n")
+
+    # Disagreements
+    dr = outcome.get("disagreements")
+    disagreements_found = (
+        dr is not None
+        and dr.content is not None
+        and not dr.content.strip().upper().startswith(DISAGREEMENT_ABSENT_MARKER)
+    )
+    if disagreements_found:
+        lines.append("---\n")
+        lines.append(f"## Key Disagreements  ({dr.elapsed_seconds:.1f}s)\n")
+        lines.append(f"{dr.content.strip()}\n")
+    elif dr is not None and dr.content:
+        lines.append("\n*No significant disagreements detected.*\n")
+
+    # Final synthesis
+    sr = outcome["synthesis"]
+    lines.append("---\n")
+    lines.append(f"## Final Synthesized Answer  ({sr.elapsed_seconds:.1f}s)\n")
+    if sr.content:
+        lines.append(f"{sr.content.strip()}\n")
+    else:
+        lines.append(f"**Synthesis failed:** {sr.error}\n")
+
+    os.makedirs(save_dir, exist_ok=True)
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
+    return filepath
+
+
 async def run_query(
     prompt: str,
     api_key: str,
     sub_models: list[dict],
     master_model: dict,
     category: str | None = None,
+    save_dir: str | None = None,
 ) -> None:
     all_models = sub_models + [master_model]
     results_received: dict[str, ModelResult] = {}
@@ -444,8 +516,31 @@ async def run_query(
     else:
         console.print(f"\n[bold red]Synthesis failed:[/] {sr.error}")
 
+    # Export to markdown if --save was used
+    if save_dir is not None:
+        path = export_markdown(prompt, outcome, category=category, save_dir=save_dir)
+        console.print(f"\n[bold green]Saved:[/] {path}")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="SynthesizAIr — multi-model synthesis via OpenRouter",
+    )
+    parser.add_argument(
+        "--save", "--export",
+        dest="save_dir",
+        nargs="?",
+        const=".",
+        default=None,
+        metavar="DIR",
+        help="Save each synthesis result as a markdown file. "
+             "Optionally specify an output directory (default: current directory).",
+    )
+    return parser.parse_args()
+
 
 async def main() -> None:
+    args = parse_args()
     api_key = get_api_key()
 
     console.print(Panel.fit(
@@ -499,7 +594,7 @@ async def main() -> None:
             console.print("[dim]Goodbye.[/]")
             break
 
-        await run_query(stripped, api_key, query_sub, query_master, category=category)
+        await run_query(stripped, api_key, query_sub, query_master, category=category, save_dir=args.save_dir)
 
 
 if __name__ == "__main__":
