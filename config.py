@@ -149,16 +149,16 @@ DEFAULT_MASTER_MODEL = {
 
 # Non-free (paid) default lineup — higher-quality models
 DEFAULT_NONFREE_SUB_MODELS = [
-    {"id": "anthropic/claude-sonnet-4",             "label": "Claude Sonnet 4",        "role": "Analytical"},
+    {"id": "anthropic/claude-sonnet-4-6",           "label": "Claude Sonnet 4.6",      "role": "Analytical"},
     {"id": "google/gemini-2.5-pro-preview",         "label": "Gemini 2.5 Pro",         "role": "Devil's Advocate"},
-    {"id": "openai/gpt-4.1",                        "label": "GPT-4.1",                "role": "Creative"},
+    {"id": "openai/gpt-5.2",                        "label": "GPT-5.2",                "role": "Creative"},
     {"id": "meta-llama/llama-4-maverick",           "label": "Llama 4 Maverick",       "role": "Pragmatist"},
     {"id": "deepseek/deepseek-r1",                  "label": "DeepSeek R1",            "role": "Synthesizer"},
 ]
 
 DEFAULT_NONFREE_MASTER_MODEL = {
-    "id": "anthropic/claude-sonnet-4",
-    "label": "Claude Sonnet 4 (Master)",
+    "id": "anthropic/claude-sonnet-4-6",
+    "label": "Claude Sonnet 4.6 (Master)",
 }
 
 # ---------------------------------------------------------------------------
