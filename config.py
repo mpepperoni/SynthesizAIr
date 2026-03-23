@@ -151,7 +151,7 @@ DEFAULT_MASTER_MODEL = {
 DEFAULT_NONFREE_SUB_MODELS = [
     {"id": "anthropic/claude-sonnet-4-6",           "label": "Claude Sonnet 4.6",      "role": "Analytical"},
     {"id": "google/gemini-2.5-pro-preview",         "label": "Gemini 2.5 Pro",         "role": "Devil's Advocate"},
-    {"id": "openai/gpt-5.2",                        "label": "GPT-5.2",                "role": "Creative"},
+    {"id": "openai/gpt-5.4",                        "label": "GPT-5.4",                "role": "Creative"},
     {"id": "meta-llama/llama-4-maverick",           "label": "Llama 4 Maverick",       "role": "Pragmatist"},
     {"id": "deepseek/deepseek-r1",                  "label": "DeepSeek R1",            "role": "Synthesizer"},
 ]
@@ -169,10 +169,10 @@ DEFAULT_NONFREE_MASTER_MODEL = {
 # Grok as Devil's Advocate anchors adversarial challenge; Gemini doubles on
 # analytical + pragmatist for structured reasoning.
 PRESET_GROK_ANCHORED_SUB_MODELS = [
-    {"id": "google/gemini-3.1-pro",         "label": "Gemini 3.1 Pro",        "role": "Analytical"},
-    {"id": "x-ai/grok-4-20b-beta",          "label": "Grok 4 20B",            "role": "Devil's Advocate"},
-    {"id": "openai/gpt-5.4",                "label": "GPT-5.4",               "role": "Creative"},
-    {"id": "google/gemini-3.1-pro",          "label": "Gemini 3.1 Pro",        "role": "Pragmatist"},
+    {"id": "google/gemini-3.1-pro-preview",  "label": "Gemini 3.1 Pro",        "role": "Analytical"},
+    {"id": "x-ai/grok-4.20-beta",            "label": "Grok 4.20",             "role": "Devil's Advocate"},
+    {"id": "openai/gpt-5.4",                 "label": "GPT-5.4",               "role": "Creative"},
+    {"id": "google/gemini-3.1-pro-preview",  "label": "Gemini 3.1 Pro",        "role": "Pragmatist"},
     {"id": "minimax/minimax-m2.7",           "label": "MiniMax M2.7",          "role": "Synthesizer"},
 ]
 
@@ -186,7 +186,7 @@ PRESET_GROK_ANCHORED_MASTER_MODEL = {
 PRESET_INTUITION_SUB_MODELS = [
     {"id": "anthropic/claude-sonnet-4-6",    "label": "Claude Sonnet 4.6",     "role": "Analytical"},
     {"id": "google/gemini-2.5-pro-preview",  "label": "Gemini 2.5 Pro",        "role": "Devil's Advocate"},
-    {"id": "openai/gpt-5.2",                 "label": "GPT-5.2",               "role": "Creative"},
+    {"id": "openai/gpt-5.4",                 "label": "GPT-5.4",               "role": "Creative"},
     {"id": "meta-llama/llama-4-maverick",    "label": "Llama 4 Maverick",      "role": "Pragmatist"},
     {"id": "deepseek/deepseek-r1",           "label": "DeepSeek R1",           "role": "Synthesizer"},
 ]
