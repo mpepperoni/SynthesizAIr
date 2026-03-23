@@ -145,6 +145,17 @@ python synthesizer.py
 
 Starts a terminal UI. Select a category, enter your question, watch all six models respond in real time, then get the synthesized answer.
 
+#### `--save` / `--export`
+
+Save each synthesis result as a markdown file:
+
+```bash
+python synthesizer.py --save              # saves to current directory
+python synthesizer.py --save ./results    # saves to ./results/
+```
+
+Each run produces a timestamped file like `synthesis_What_is_quantum_computing_20260323T141500Z.md` containing the full prompt, all individual responses, disagreements, and the final synthesis.
+
 Two modes available at startup:
 - **Auto** — Uses default model/role assignments with category-based preset suggestion
 - **Custom** — Fetches full model list from OpenRouter, assign any model to any role
