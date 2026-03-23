@@ -151,12 +151,12 @@ All defaults use free-tier OpenRouter models:
 
 | Role | Model | Why |
 |------|-------|-----|
-| Analytical | Nemotron Super 49B | 262K context, hybrid architecture, near o4-mini reasoning performance |
-| Devil's Advocate | GPT-OSS 20B | OpenAI open-weight, strong instruction following for adversarial prompts |
-| Creative | Trinity Large | Purpose-built for creative writing and storytelling, 512K context |
-| Pragmatist | Llama 3.3 70B | Reliable GPT-4 level workhorse, consistent structured output |
-| Synthesizer | Mistral Small 3.1 24B | Strong text reasoning, 128K context, good at connecting threads |
-| **Master** | **Nemotron Super 49B** | Same as Analytical — doubles as master for cost-free synthesis |
+| Analytical | Nemotron 3 Super 120B | 262K context, 120B hybrid MoE, strong structured reasoning |
+| Devil's Advocate | Step 3.5 Flash | 256K context, MoE architecture, strong adversarial reasoning |
+| Creative | Trinity Large | 400B sparse MoE, purpose-built for creative writing, 131K context |
+| Pragmatist | MiniMax M2.5 | 196K context, productivity-focused, consistent structured output |
+| Synthesizer | Nemotron 3 Nano 30B | 256K context, efficient MoE, good at connecting threads |
+| **Master** | **Nemotron 3 Super 120B** | Same as Analytical — doubles as master for cost-free synthesis |
 
 > **Rate limits:** The OpenRouter free tier allows 20 req/min and 200 req/day. When batch testing, use the `--delay` flag between phases to avoid quota errors (e.g. `--delay 5`).
 
