@@ -135,16 +135,16 @@ CATEGORY_NAMES: list[str] = list(CATEGORIES.keys())
 # ---------------------------------------------------------------------------
 
 DEFAULT_SUB_MODELS = [
-    {"id": "nvidia/nemotron-3-nano-30b-a3b:free",      "label": "Nemotron Nano 30B",    "role": "Analytical"},
-    {"id": "stepfun/step-3.5-flash:free",               "label": "Step 3.5 Flash",       "role": "Devil's Advocate"},
-    {"id": "minimax/minimax-m2.5:free",                  "label": "MiniMax M2.5",          "role": "Creative"},
-    {"id": "liquid/lfm-2.5-1.2b-instruct:free",         "label": "LFM 1.2B Instruct",    "role": "Pragmatist"},
-    {"id": "arcee-ai/trinity-large-preview:free",        "label": "Trinity Large",         "role": "Synthesizer"},
+    {"id": "nvidia/nemotron-super-49b-v1:free",              "label": "Nemotron Super 49B",       "role": "Analytical"},
+    {"id": "openai/gpt-oss-20b:free",                        "label": "GPT-OSS 20B",              "role": "Devil's Advocate"},
+    {"id": "arcee-ai/trinity-large-preview:free",             "label": "Trinity Large",             "role": "Creative"},
+    {"id": "meta-llama/llama-3.3-70b-instruct:free",         "label": "Llama 3.3 70B",            "role": "Pragmatist"},
+    {"id": "mistralai/mistral-small-3.1-24b-instruct:free",  "label": "Mistral Small 3.1 24B",    "role": "Synthesizer"},
 ]
 
 DEFAULT_MASTER_MODEL = {
-    "id": "nvidia/nemotron-3-super-120b-a12b:free",
-    "label": "Nemotron Super 120B (Master)",
+    "id": "nvidia/nemotron-super-49b-v1:free",
+    "label": "Nemotron Super 49B (Master)",
 }
 
 # Non-free (paid) default lineup — higher-quality models
