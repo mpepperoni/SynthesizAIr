@@ -1,14 +1,14 @@
 # SynthesizAIr
 
-A multi-model AI orchestration system that leverages five cognitively-distinct sub-models to synthesize sophisticated, multi-perspective answers to complex questions. Instead of relying on a single model, SynthesizAIr distributes a question across specialized models, identifies disagreements, and reconciles perspectives into a unified final answer.
+Multi-model AI orchestration that distributes questions across five cognitively-distinct sub-models, detects disagreements, and synthesizes a unified answer — producing richer, more balanced responses than any single model alone.
 
 ## How It Works
 
 SynthesizAIr runs a three-phase pipeline:
 
-1. **Parallel Sub-Model Queries** — Five sub-models, each assigned a distinct cognitive role, process the question simultaneously alongside a master model's independent view.
-2. **Disagreement Detection** — The master model reviews all responses and identifies substantive tensions between perspectives.
-3. **Final Synthesis** — The master model reconciles all perspectives, guided by category-specific weighting, into one definitive answer.
+1. **Parallel Sub-Model Queries** — Five sub-models, each with a distinct cognitive role, process the question simultaneously alongside the master model's independent view.
+2. **Disagreement Detection** — The master model identifies substantive tensions between perspectives.
+3. **Final Synthesis** — The master model reconciles all perspectives, guided by category-specific weighting, into a single definitive answer.
 
 ### Cognitive Roles
 
@@ -103,7 +103,7 @@ Options:
 - `--judge` — Override judge model
 - `--no-judge` — Skip judge scoring
 
-Backward compatible: `python batch_tester.py test_prompts.json` still works.
+Legacy syntax `python batch_tester.py test_prompts.json` is also supported.
 
 ### Matrix Experiments
 
@@ -189,14 +189,15 @@ Key settings in `config.py`:
 ## Project Structure
 
 ```
-├── api.py              # FastAPI REST interface
-├── orchestrator.py     # Core multi-model orchestration pipeline
-├── synthesizer.py      # Interactive CLI with rich terminal UI
-├── batch_tester.py     # Batch evaluation harness with judge scoring
-├── config.py           # Models, roles, categories, prompts, hyperparameters
-├── test_prompts.json   # Sample test prompts
-├── requirements.txt    # Python dependencies
-└── LICENSE             # GPL-3.0
+├── synthesizer.py        # Interactive CLI with rich terminal UI
+├── api.py                # FastAPI REST interface
+├── orchestrator.py       # Core multi-model orchestration pipeline
+├── batch_tester.py       # Batch evaluation & matrix experiment harness
+├── config.py             # Models, roles, categories, prompts, hyperparameters
+├── test_prompts.json     # Sample test prompts
+├── model_shootout.json   # Extended prompt set for model comparison
+├── requirements.txt      # Python dependencies
+└── LICENSE               # GPL-3.0
 ```
 
 ## License
