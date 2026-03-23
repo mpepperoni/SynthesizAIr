@@ -268,7 +268,7 @@ Key settings in `config.py`:
 |---|---|---|
 | `REQUEST_TIMEOUT_SECONDS` | 60 | Timeout per API call |
 | `MAX_TOKENS_SUB` | 1024 | Max tokens for sub-model responses |
-| `MAX_TOKENS_MASTER` | 2048 | Max tokens for master synthesis |
+| `MAX_TOKENS_MASTER` | 8192 | Max tokens for master synthesis |
 | `MAX_TOKENS_DISAGREEMENT` | 600 | Max tokens for disagreement detection |
 | `TEMPERATURE_SUB` | 0.7 | Creativity for sub-models |
 | `TEMPERATURE_MASTER` | 0.3 | Precision for master model |
