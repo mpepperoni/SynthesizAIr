@@ -162,6 +162,60 @@ DEFAULT_NONFREE_MASTER_MODEL = {
 }
 
 # ---------------------------------------------------------------------------
+# Tested presets — named configurations optimised for specific categories
+# ---------------------------------------------------------------------------
+
+# Best for Strategy/Planning (24/30) and Research/Synthesis (23/30).
+# Grok as Devil's Advocate anchors adversarial challenge; Gemini doubles on
+# analytical + pragmatist for structured reasoning.
+PRESET_GROK_ANCHORED_SUB_MODELS = [
+    {"id": "google/gemini-3.1-pro",         "label": "Gemini 3.1 Pro",        "role": "Analytical"},
+    {"id": "x-ai/grok-4-20b-beta",          "label": "Grok 4 20B",            "role": "Devil's Advocate"},
+    {"id": "openai/gpt-5.4",                "label": "GPT-5.4",               "role": "Creative"},
+    {"id": "google/gemini-3.1-pro",          "label": "Gemini 3.1 Pro",        "role": "Pragmatist"},
+    {"id": "minimax/minimax-m2.7",           "label": "MiniMax M2.7",          "role": "Synthesizer"},
+]
+
+PRESET_GROK_ANCHORED_MASTER_MODEL = {
+    "id": "anthropic/claude-sonnet-4-6",
+    "label": "Claude Sonnet 4.6 (Master)",
+}
+
+# Best for Analysis/Evaluation (22/30) and Creative/Brainstorming (21/30).
+# Mirrors the paid-panel default (Lineup A) — balanced diversity across vendors.
+PRESET_INTUITION_SUB_MODELS = [
+    {"id": "anthropic/claude-sonnet-4-6",    "label": "Claude Sonnet 4.6",     "role": "Analytical"},
+    {"id": "google/gemini-2.5-pro-preview",  "label": "Gemini 2.5 Pro",        "role": "Devil's Advocate"},
+    {"id": "openai/gpt-5.2",                 "label": "GPT-5.2",               "role": "Creative"},
+    {"id": "meta-llama/llama-4-maverick",    "label": "Llama 4 Maverick",      "role": "Pragmatist"},
+    {"id": "deepseek/deepseek-r1",           "label": "DeepSeek R1",           "role": "Synthesizer"},
+]
+
+PRESET_INTUITION_MASTER_MODEL = {
+    "id": "anthropic/claude-sonnet-4-6",
+    "label": "Claude Sonnet 4.6 (Master)",
+}
+
+# Map category names to their recommended preset
+CATEGORY_PRESET_RECOMMENDATIONS: dict[str, str] = {
+    "Strategy/Planning":     "GROK_ANCHORED",
+    "Research/Synthesis":    "GROK_ANCHORED",
+    "Analysis/Evaluation":   "INTUITION",
+    "Creative/Brainstorming": "INTUITION",
+}
+
+PRESETS: dict[str, dict] = {
+    "GROK_ANCHORED": {
+        "sub_models": PRESET_GROK_ANCHORED_SUB_MODELS,
+        "master_model": PRESET_GROK_ANCHORED_MASTER_MODEL,
+    },
+    "INTUITION": {
+        "sub_models": PRESET_INTUITION_SUB_MODELS,
+        "master_model": PRESET_INTUITION_MASTER_MODEL,
+    },
+}
+
+# ---------------------------------------------------------------------------
 # Request settings
 # ---------------------------------------------------------------------------
 
@@ -230,6 +284,10 @@ As a reminder, the cognitive roles provide:
 - Pragmatist: real-world applicability and practical constraints
 - Synthesizer: integrative connections and meta-patterns
 - Your own independent view: baseline to validate and anchor the above
+
+Your synthesis must be comprehensive but concise. Limit your response to 1500 words \
+maximum. Prioritize completing all sections over depth in any single section. Never cut \
+off mid-sentence.
 
 Where perspectives align, state the consensus confidently. Where they diverge, reason \
 through which position is best supported given the question's context. Do not merely \

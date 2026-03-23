@@ -15,12 +15,14 @@ from rich.text import Text
 from config import (
     CATEGORIES,
     CATEGORY_NAMES,
+    CATEGORY_PRESET_RECOMMENDATIONS,
     DEFAULT_MASTER_MODEL,
     DEFAULT_NONFREE_MASTER_MODEL,
     DEFAULT_NONFREE_SUB_MODELS,
     DEFAULT_SUB_MODELS,
     DISAGREEMENT_ABSENT_MARKER,
     OPENROUTER_MODELS_ENDPOINT,
+    PRESETS,
     REQUEST_TIMEOUT_SECONDS,
     ROLES,
     ROLE_NAMES,
@@ -123,8 +125,13 @@ def display_roles() -> None:
     console.print(table)
 
 
-def select_category() -> str | None:
-    """Prompt the user to pick a prompt category. Returns the category name, or None to quit."""
+def select_category() -> tuple[str, str | None] | None:
+    """Prompt the user to pick a prompt category.
+
+    Returns ``(category_name, preset_name_or_None)`` where *preset_name* is
+    set only if the user accepted the recommended preset for that category.
+    Returns ``None`` to quit.
+    """
     console.print("\n[bold]Prompt category:[/]")
     for i, name in enumerate(CATEGORY_NAMES, 1):
         color = CATEGORIES[name]["color"]
@@ -135,7 +142,21 @@ def select_category() -> str | None:
     choice = Prompt.ask("\nCategory", choices=valid)
     if choice == "q":
         return None
-    return CATEGORY_NAMES[int(choice) - 1]
+    category = CATEGORY_NAMES[int(choice) - 1]
+
+    # Suggest the optimal preset for this category
+    preset_name = CATEGORY_PRESET_RECOMMENDATIONS.get(category)
+    accepted_preset: str | None = None
+    if preset_name:
+        console.print(
+            f"\n[bold yellow]Based on testing, {preset_name.replace('_', '-')} preset "
+            f"performs best for {category}. Use it? (y/n)[/]"
+        )
+        use_preset = Prompt.ask("", choices=["y", "n"], default="y")
+        if use_preset == "y":
+            accepted_preset = preset_name
+
+    return category, accepted_preset
 
 
 def parse_indices(raw: str, max_idx: int) -> list[int] | None:
@@ -447,10 +468,25 @@ async def main() -> None:
 
     while True:
         try:
-            category = select_category()
-            if category is None:
+            result = select_category()
+            if result is None:
                 console.print("[dim]Goodbye.[/]")
                 break
+            category, accepted_preset = result
+
+            # Apply preset models for this query if accepted
+            query_sub = sub_models
+            query_master = master_model
+            if accepted_preset and accepted_preset in PRESETS:
+                preset = PRESETS[accepted_preset]
+                query_sub = preset["sub_models"]
+                query_master = preset["master_model"]
+                preset_label = accepted_preset.replace("_", "-")
+                console.print(
+                    f"[green]Using {preset_label} preset:[/] "
+                    f"Master: [yellow]{query_master['label']}[/]"
+                )
+
             prompt = Prompt.ask("\n[bold green]>[/]")
         except (KeyboardInterrupt, EOFError):
             console.print("\n[dim]Goodbye.[/]")
@@ -463,7 +499,7 @@ async def main() -> None:
             console.print("[dim]Goodbye.[/]")
             break
 
-        await run_query(stripped, api_key, sub_models, master_model, category=category)
+        await run_query(stripped, api_key, query_sub, query_master, category=category)
 
 
 if __name__ == "__main__":
