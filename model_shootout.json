@@ -56,8 +56,15 @@
       "master_model": {"id": "x-ai/grok-4.20-beta", "label": "Grok 4.20 (Master)"}
     },
     {
-      "name": "Baseline (Current defaults)",
-      "use_defaults": true
+      "name": "Baseline (Paid defaults)",
+      "sub_models": [
+        {"id": "anthropic/claude-sonnet-4-6",           "label": "Claude Sonnet 4.6",      "role": "Analytical"},
+        {"id": "google/gemini-2.5-pro-preview",         "label": "Gemini 2.5 Pro",         "role": "Devil's Advocate"},
+        {"id": "openai/gpt-5.2",                        "label": "GPT-5.2",                "role": "Creative"},
+        {"id": "meta-llama/llama-4-maverick",           "label": "Llama 4 Maverick",       "role": "Pragmatist"},
+        {"id": "deepseek/deepseek-r1",                  "label": "DeepSeek R1",            "role": "Synthesizer"}
+      ],
+      "master_model": {"id": "anthropic/claude-sonnet-4-6", "label": "Claude Sonnet 4.6 (Master)"}
     }
   ],
   "judge_model": {
